@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}Danh Sách Lịch Hẹn{% endblock %}
+{% block page_title %}Danh Sách Lịch Hẹn{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex flex-wrap gap-1">
+        <a href="{% url 'appointments:list' %}" class="btn btn-sm {% if not status_filter %}btn-secondary{% else %}btn-outline-secondary{% endif %}">Tất cả</a>
+        <a href="?status=pending" class="btn btn-sm {% if status_filter == 'pending' %}btn-warning{% else %}btn-outline-warning{% endif %}">Chờ xác nhận</a>
+        <a href="?status=confirmed" class="btn btn-sm {% if status_filter == 'confirmed' %}btn-primary{% else %}btn-outline-primary{% endif %}">Đã xác nhận</a>
+        <a href="?status=checked_in" class="btn btn-sm {% if status_filter == 'checked_in' %}btn-info{% else %}btn-outline-info{% endif %}">Đã check-in</a>
+        <a href="?status=done" class="btn btn-sm {% if status_filter == 'done' %}btn-success{% else %}btn-outline-success{% endif %}">Hoàn thành</a>
+        <a href="?status=cancelled" class="btn btn-sm {% if status_filter == 'cancelled' %}btn-danger{% else %}btn-outline-danger{% endif %}">Đã hủy</a>
+    </div>
+    <a href="{% url 'appointments:create' %}" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>Tạo lịch</a>
+</div>
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover table-striped mb-0">
+            <thead class="table-dark"><tr><th>#</th><th>Bệnh nhân</th><th>Bác sĩ</th><th>Ngày khám</th><th>Giờ</th><th>Trạng thái</th><th class="text-center">Hành động</th></tr></thead>
+            <tbody>
+                {% for a in appointments %}
+                <tr>
+                    <td class="text-muted">{{ forloop.counter }}</td>
+                    <td>{{ a.patient.full_name }}</td>
+                    <td>BS. {{ a.doctor.full_name }}</td>
+                    <td>{{ a.date|date:"d/m/Y" }}</td>
+                    <td>{{ a.start_time|time:"H:i" }}–{{ a.end_time|time:"H:i" }}</td>
+                    <td><span class="badge bg-{{ a.get_status_badge_class }}">{{ a.get_status_display }}</span></td>
+                    <td class="text-center"><a href="{% url 'appointments:detail' a.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i> Chi tiết</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="text-center py-5 text-muted"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>Không có lịch hẹn nào.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer text-muted small">Tổng: {{ appointments|length }} lịch hẹn</div>
+</div>
+{% endblock %}

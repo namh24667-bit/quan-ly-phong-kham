@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Xác Nhận Xóa{% endblock %}
+{% block page_title %}Xác Nhận Xóa Bệnh Nhân{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card shadow border-danger">
+            <div class="card-header bg-danger text-white"><h4 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>Xác Nhận Xóa</h4></div>
+            <div class="card-body text-center py-4">
+                <div class="fs-1 mb-3">⚠️</div>
+                <h5>Xóa bệnh nhân này?</h5>
+                <div class="alert alert-warning"><strong>{{ patient.full_name }}</strong><br><small>SĐT: {{ patient.phone }} | Ngày sinh: {{ patient.date_of_birth|date:"d/m/Y" }}</small></div>
+                <p class="text-danger"><strong>Hành động này không thể hoàn tác!</strong></p>
+            </div>
+            <div class="card-footer bg-transparent">
+                <div class="d-flex gap-3 justify-content-center">
+                    <a href="{% url 'patients:detail' pk=patient.pk %}" class="btn btn-secondary btn-lg"><i class="bi bi-x-circle me-1"></i>Hủy</a>
+                    <form method="post" action="{% url 'patients:delete' pk=patient.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-lg"><i class="bi bi-trash me-1"></i>Xóa vĩnh viễn</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

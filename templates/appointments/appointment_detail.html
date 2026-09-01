@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block title %}Chi Tiết Lịch Hẹn #{{ appointment.pk }}{% endblock %}
+{% block page_title %}Chi Tiết Lịch Hẹn #{{ appointment.pk }}{% endblock %}
+{% block content %}
+<div class="mb-3"><a href="{% url 'appointments:list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Quay lại</a></div>
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-calendar-check me-2"></i>Lịch hẹn #{{ appointment.pk }}</h5>
+                <span class="badge bg-{{ appointment.get_status_badge_class }} fs-6">{{ appointment.get_status_display }}</span>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-4">Bệnh nhân:</dt>
+                    <dd class="col-sm-8"><a href="{% url 'patients:detail' appointment.patient.pk %}">{{ appointment.patient.full_name }}</a></dd>
+                    <dt class="col-sm-4">Bác sĩ:</dt><dd class="col-sm-8">BS. {{ appointment.doctor.full_name }}</dd>
+                    <dt class="col-sm-4">Ngày khám:</dt><dd class="col-sm-8">{{ appointment.date|date:"d/m/Y" }}</dd>
+                    <dt class="col-sm-4">Giờ khám:</dt><dd class="col-sm-8">{{ appointment.start_time|time:"H:i" }} – {{ appointment.end_time|time:"H:i" }}</dd>
+                    {% if appointment.note %}<dt class="col-sm-4">Ghi chú:</dt><dd class="col-sm-8">{{ appointment.note }}</dd>{% endif %}
+                    <dt class="col-sm-4">Tạo lúc:</dt><dd class="col-sm-8 text-muted small">{{ appointment.created_at|date:"d/m/Y H:i" }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-header"><h6 class="mb-0"><i class="bi bi-gear me-1"></i>Hành động</h6></div>
+            <div class="card-body d-grid gap-2">
+                {% if appointment.status == 'pending' %}
+                <form method="post" action="{% url 'appointments:confirm' appointment.pk %}">{% csrf_token %}
+                    <button type="submit" class="btn btn-primary w-100" onclick="return confirm('Xác nhận lịch hẹn này?')"><i class="bi bi-check-circle me-1"></i>Xác nhận lịch</button>
+                </form>
+                <form method="post" action="{% url 'appointments:cancel' appointment.pk %}">{% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm('Hủy lịch hẹn?')"><i class="bi bi-x-circle me-1"></i>Hủy lịch</button>
+                </form>
+                {% elif appointment.status == 'confirmed' %}
+                <form method="post" action="{% url 'appointments:checkin' appointment.pk %}">{% csrf_token %}
+                    <button type="submit" class="btn btn-info w-100 text-white" onclick="return confirm('Bệnh nhân đã đến?')"><i class="bi bi-box-arrow-in-right me-1"></i>Check-in</button>
+                </form>
+                <form method="post" action="{% url 'appointments:cancel' appointment.pk %}">{% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm('Hủy lịch?')"><i class="bi bi-x-circle me-1"></i>Hủy lịch</button>
+                </form>
+                {% elif appointment.status == 'checked_in' %}
+                <form method="post" action="{% url 'appointments:done' appointment.pk %}">{% csrf_token %}
+                    <button type="submit" class="btn btn-success w-100" onclick="return confirm('Đánh dấu hoàn thành?')"><i class="bi bi-check2-all me-1"></i>Hoàn thành</button>
+                </form>
+                {% elif appointment.status == 'done' %}
+                <p class="text-center text-muted mb-0"><i class="bi bi-check-circle-fill text-success"></i> Đã hoàn thành.</p>
+                {% elif appointment.status == 'cancelled' %}
+                <p class="text-center text-muted mb-0"><i class="bi bi-x-circle-fill text-danger"></i> Đã hủy.</p>
+                {% endif %}
+                {% if appointment.status not in 'done,cancelled' %}
+                <hr class="my-1">
+                <a href="{% url 'appointments:update' appointment.pk %}" class="btn btn-outline-secondary btn-sm w-100"><i class="bi bi-pencil me-1"></i>Chỉnh sửa</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

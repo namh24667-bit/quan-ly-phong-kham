@@ -1,0 +1,212 @@
+{% extends 'base.html' %}
+{% block title %}{% if form.instance.pk %}Sửa Lịch Hẹn{% else %}Tạo Lịch Hẹn Mới{% endif %}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<!-- Select2: dropdown có tìm kiếm -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+<style>
+    /* Làm Select2 khớp với Bootstrap 5 */
+    .select2-container--default .select2-selection--single {
+        height: 38px;
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        padding: 4px 8px;
+        font-size: 1rem;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 36px;
+        right: 8px;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 28px;
+        color: #212529;
+        padding-left: 4px;
+    }
+    .select2-container--default .select2-results__option--highlighted {
+        background-color: #0d6efd;
+    }
+    .select2-dropdown {
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,.1);
+    }
+    .select2-search__field {
+        border-radius: 0.25rem !important;
+        padding: 4px 8px !important;
+    }
+    /* Highlight tên khi match */
+    .select2-results__option mark {
+        background: #fff3cd;
+        padding: 0;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-calendar-plus me-2"></i>{{ title }}
+                </h5>
+            </div>
+            <div class="card-body p-4">
+                {% if form.instance.pk %}
+                <form method="post" action="{% url 'appointments:update' form.instance.pk %}">
+                {% else %}
+                <form method="post" action="{% url 'appointments:create' %}">
+                {% endif %}
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for e in form.non_field_errors %}
+                    <p class="mb-0"><i class="bi bi-exclamation-triangle me-1"></i>{{ e }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Bệnh nhân: có tìm kiếm -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-person me-1 text-primary"></i>
+                        Bệnh nhân <span class="text-danger">*</span>
+                    </label>
+                    {{ form.patient }}
+                    {% if form.patient.errors %}
+                    <div class="text-danger small mt-1">{{ form.patient.errors.0 }}</div>
+                    {% endif %}
+                    <div class="form-text">Gõ tên hoặc SĐT để tìm nhanh</div>
+                </div>
+
+                <!-- Bác sĩ: có tìm kiếm -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-person-badge me-1 text-success"></i>
+                        Bác sĩ <span class="text-danger">*</span>
+                    </label>
+                    {{ form.doctor }}
+                    {% if form.doctor.errors %}
+                    <div class="text-danger small mt-1">{{ form.doctor.errors.0 }}</div>
+                    {% endif %}
+                    <div class="form-text">Gõ tên hoặc chuyên khoa để tìm nhanh</div>
+                </div>
+
+                <!-- Ngày khám -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-calendar3 me-1 text-warning"></i>
+                        Ngày khám <span class="text-danger">*</span>
+                    </label>
+                    {{ form.date }}
+                    {% if form.date.errors %}
+                    <div class="text-danger small mt-1">{{ form.date.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Giờ bắt đầu / kết thúc -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-clock me-1 text-info"></i>
+                            Giờ bắt đầu <span class="text-danger">*</span>
+                        </label>
+                        {{ form.start_time }}
+                        {% if form.start_time.errors %}
+                        <div class="text-danger small mt-1">{{ form.start_time.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-clock-history me-1 text-info"></i>
+                            Giờ kết thúc <span class="text-danger">*</span>
+                        </label>
+                        {{ form.end_time }}
+                        {% if form.end_time.errors %}
+                        <div class="text-danger small mt-1">{{ form.end_time.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Ghi chú -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-card-text me-1 text-secondary"></i>
+                        Ghi chú
+                    </label>
+                    {{ form.note }}
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary px-4">
+                        <i class="bi bi-save me-1"></i>
+                        {% if form.instance.pk %}Lưu thay đổi{% else %}Tạo lịch hẹn{% endif %}
+                    </button>
+                    <a href="{% url 'appointments:list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-circle me-1"></i>Hủy
+                    </a>
+                </div>
+
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+$(document).ready(function() {
+
+    // ── Bệnh nhân: tìm kiếm theo tên ──────────────────────────────
+    $('#id_patient').select2({
+        placeholder: 'Gõ tên bệnh nhân để tìm...',
+        allowClear: true,
+        width: '100%',
+        language: {
+            noResults:    function() { return 'Không tìm thấy bệnh nhân'; },
+            searching:    function() { return 'Đang tìm...'; },
+            inputTooShort: function() { return 'Gõ ít nhất 1 ký tự'; },
+        },
+        // Hàm lọc: tìm theo text hiển thị (tên bệnh nhân)
+        matcher: function(params, data) {
+            if (!params.term || params.term.trim() === '') return data;
+            var term = params.term.toLowerCase();
+            var text = data.text.toLowerCase();
+            if (text.indexOf(term) > -1) return data;
+            return null;
+        },
+        // Tô màu phần chữ match
+        templateResult: function(data) {
+            if (!data.id) return data.text; // placeholder
+            return data.text;
+        }
+    });
+
+    // ── Bác sĩ: tìm kiếm theo tên / chuyên khoa ──────────────────
+    $('#id_doctor').select2({
+        placeholder: 'Gõ tên bác sĩ hoặc chuyên khoa...',
+        allowClear: true,
+        width: '100%',
+        language: {
+            noResults:    function() { return 'Không tìm thấy bác sĩ'; },
+            searching:    function() { return 'Đang tìm...'; },
+            inputTooShort: function() { return 'Gõ ít nhất 1 ký tự'; },
+        },
+        matcher: function(params, data) {
+            if (!params.term || params.term.trim() === '') return data;
+            var term = params.term.toLowerCase();
+            var text = data.text.toLowerCase();
+            if (text.indexOf(term) > -1) return data;
+            return null;
+        }
+    });
+
+});
+</script>
+{% endblock %}

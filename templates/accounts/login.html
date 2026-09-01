@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng nhập – ClinicMS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .login-card { border: none; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.3); max-width: 420px; width: 100%; }
+        .login-header { background: linear-gradient(135deg, #1e3a5f, #2d5986); border-radius: 16px 16px 0 0; padding: 2rem; text-align: center; }
+    </style>
+</head>
+<body>
+<div class="login-card card">
+    <div class="login-header text-white">
+        <i class="bi bi-hospital fs-1"></i>
+        <h4 class="fw-bold mt-2 mb-0">ClinicMS</h4>
+        <small class="opacity-75">Hệ thống Quản lý Phòng khám</small>
+    </div>
+    <div class="card-body p-4">
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <h5 class="text-center text-muted mb-4">Đăng nhập tài khoản</h5>
+
+        <form method="post" action="{% url 'accounts:login' %}">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label class="form-label fw-semibold"><i class="bi bi-person me-1"></i>Tên đăng nhập</label>
+                <input type="text" class="form-control form-control-lg" name="username"
+                       placeholder="Nhập tên đăng nhập..." value="{{ request.POST.username }}" required>
+            </div>
+            <div class="mb-4">
+                <label class="form-label fw-semibold"><i class="bi bi-lock me-1"></i>Mật khẩu</label>
+                <div class="input-group">
+                    <input type="password" class="form-control form-control-lg" id="pwd"
+                           name="password" placeholder="Nhập mật khẩu..." required>
+                    <button class="btn btn-outline-secondary" type="button" onclick="togglePwd()">
+                        <i class="bi bi-eye" id="eyeIcon"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-box-arrow-in-right me-2"></i>Đăng nhập
+                </button>
+            </div>
+        </form>
+    </div>
+    <div class="card-footer text-center text-muted small py-3">
+        <i class="bi bi-shield-lock me-1"></i>Liên hệ admin nếu quên mật khẩu
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function togglePwd() {
+    var p = document.getElementById('pwd');
+    var i = document.getElementById('eyeIcon');
+    p.type = p.type === 'password' ? 'text' : 'password';
+    i.className = p.type === 'password' ? 'bi bi-eye' : 'bi bi-eye-slash';
+}
+</script>
+</body>
+</html>

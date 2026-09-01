@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Xác Nhận Xóa Bác Sĩ{% endblock %}
+{% block page_title %}Xác Nhận Xóa{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card shadow border-danger">
+            <div class="card-header bg-danger text-white"><h4 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>Xác Nhận Xóa</h4></div>
+            <div class="card-body text-center py-4">
+                <h5>Xóa bác sĩ: <strong>{{ doctor.full_name }}</strong>?</h5>
+                <p class="text-muted">Chuyên khoa: {{ doctor.specialty }}</p>
+                {% if active_count > 0 %}
+                <div class="alert alert-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i><strong>Không thể xóa!</strong><br>Bác sĩ này còn <strong>{{ active_count }}</strong> lịch hẹn đang hoạt động.</div>
+                <a href="{% url 'doctors:detail' pk=doctor.pk %}" class="btn btn-secondary btn-lg"><i class="bi bi-arrow-left me-1"></i>Quay lại</a>
+                {% else %}
+                <div class="alert alert-warning"><strong>Hành động này không thể hoàn tác!</strong></div>
+                <div class="d-flex gap-3 justify-content-center">
+                    <a href="{% url 'doctors:detail' pk=doctor.pk %}" class="btn btn-secondary btn-lg">Hủy</a>
+                    <form method="post" action="{% url 'doctors:delete' pk=doctor.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-lg"><i class="bi bi-trash me-1"></i>Xóa vĩnh viễn</button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard – ClinicMS{% endblock %}
+{% block page_title %}Dashboard Tổng Quan{% endblock %}
+
+{% block content %}
+<!-- Stat Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-6 col-xl-3">
+        <div class="card text-white border-0 shadow-sm" style="background:linear-gradient(135deg,#0d6efd,#0a58ca)">
+            <div class="card-body d-flex align-items-center">
+                <div class="flex-grow-1">
+                    <p class="mb-1 opacity-75 small">Tổng Bệnh Nhân</p>
+                    <h2 class="fw-bold mb-0">{{ stats.total_patients }}</h2>
+                </div>
+                <i class="bi bi-people-fill fs-1 opacity-50"></i>
+            </div>
+            <div class="card-footer bg-transparent border-0 pt-0">
+                <a href="{% url 'patients:list' %}" class="text-white-50 small text-decoration-none">Xem danh sách <i class="bi bi-arrow-right"></i></a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card text-white border-0 shadow-sm" style="background:linear-gradient(135deg,#198754,#146c43)">
+            <div class="card-body d-flex align-items-center">
+                <div class="flex-grow-1">
+                    <p class="mb-1 opacity-75 small">Bác Sĩ Hoạt Động</p>
+                    <h2 class="fw-bold mb-0">{{ stats.active_doctors }}</h2>
+                </div>
+                <i class="bi bi-person-badge-fill fs-1 opacity-50"></i>
+            </div>
+            <div class="card-footer bg-transparent border-0 pt-0">
+                <a href="{% url 'doctors:list' %}" class="text-white-50 small text-decoration-none">Xem danh sách <i class="bi bi-arrow-right"></i></a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card text-white border-0 shadow-sm" style="background:linear-gradient(135deg,#0dcaf0,#0aa2c0)">
+            <div class="card-body d-flex align-items-center">
+                <div class="flex-grow-1">
+                    <p class="mb-1 opacity-75 small">Lịch Hẹn Hôm Nay</p>
+                    <h2 class="fw-bold mb-0">{{ stats.appointments_today }}</h2>
+                </div>
+                <i class="bi bi-calendar-check-fill fs-1 opacity-50"></i>
+            </div>
+            <div class="card-footer bg-transparent border-0 pt-0">
+                <a href="{% url 'appointments:list' %}?date={{ today|date:'Y-m-d' }}" class="text-white-50 small text-decoration-none">Xem hôm nay <i class="bi bi-arrow-right"></i></a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card text-dark border-0 shadow-sm" style="background:linear-gradient(135deg,#ffc107,#d39e00)">
+            <div class="card-body d-flex align-items-center">
+                <div class="flex-grow-1">
+                    <p class="mb-1 opacity-75 small">Chờ Xác Nhận</p>
+                    <h2 class="fw-bold mb-0">{{ stats.pending_count }}</h2>
+                </div>
+                <i class="bi bi-hourglass-split fs-1 opacity-50"></i>
+            </div>
+            <div class="card-footer bg-transparent border-0 pt-0">
+                <a href="{% url 'appointments:list' %}?status=pending" class="text-dark opacity-75 small text-decoration-none">Xem và xác nhận <i class="bi bi-arrow-right"></i></a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Lịch hẹn hôm nay -->
+    <div class="col-lg-7">
+        <div class="card shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-calendar-day me-2 text-primary"></i>Lịch Hẹn Hôm Nay <small class="text-muted fs-6">({{ today|date:"d/m/Y" }})</small></h5>
+                <a href="{% url 'appointments:create' %}" class="btn btn-sm btn-primary"><i class="bi bi-plus"></i> Tạo</a>
+            </div>
+            <div class="card-body p-0">
+                {% if appointments_today %}
+                <table class="table table-hover mb-0">
+                    <thead class="table-light"><tr><th>Giờ</th><th>Bệnh nhân</th><th>Bác sĩ</th><th>Trạng thái</th><th></th></tr></thead>
+                    <tbody>
+                        {% for appt in appointments_today %}
+                        <tr>
+                            <td class="fw-semibold">{{ appt.start_time|time:"H:i" }}</td>
+                            <td>{{ appt.patient.full_name }}</td>
+                            <td>BS. {{ appt.doctor.full_name }}</td>
+                            <td><span class="badge bg-{{ appt.get_status_badge_class }}">{{ appt.get_status_display }}</span></td>
+                            <td><a href="{% url 'appointments:detail' appt.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="text-center py-4 text-muted"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>Không có lịch hẹn hôm nay.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Sắp tới -->
+    <div class="col-lg-5">
+        <div class="card shadow-sm">
+            <div class="card-header"><h5 class="mb-0"><i class="bi bi-calendar-week me-2 text-success"></i>Sắp Tới (7 ngày)</h5></div>
+            <div class="card-body p-0">
+                {% if upcoming %}
+                <ul class="list-group list-group-flush">
+                    {% for appt in upcoming %}
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>{{ appt.patient.full_name }}</strong><br>
+                                <small class="text-muted"><i class="bi bi-calendar3 me-1"></i>{{ appt.date|date:"d/m" }} <i class="bi bi-clock ms-1 me-1"></i>{{ appt.start_time|time:"H:i" }} — BS. {{ appt.doctor.full_name }}</small>
+                            </div>
+                            <span class="badge bg-{{ appt.get_status_badge_class }}">{{ appt.get_status_display }}</span>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-center py-4 text-muted"><i class="bi bi-calendar-check fs-1 d-block mb-2"></i>Không có lịch hẹn sắp tới.</div>
+                {% endif %}
+            </div>
+            {% if upcoming %}<div class="card-footer"><a href="{% url 'appointments:list' %}" class="btn btn-outline-success btn-sm w-100">Xem tất cả <i class="bi bi-arrow-right"></i></a></div>{% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

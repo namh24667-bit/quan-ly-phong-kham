@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ClinicMS{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background-color: #f0f2f5; }
+        .sidebar {
+            width: 240px; min-height: 100vh;
+            background: linear-gradient(180deg, #1e3a5f 0%, #2d5986 100%);
+            position: fixed; top: 0; left: 0; z-index: 100;
+        }
+        .sidebar-brand {
+            padding: 1.2rem 1rem; border-bottom: 1px solid rgba(255,255,255,.15);
+            color: white; font-weight: bold; font-size: 1.1rem; text-decoration: none;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .sidebar .nav-link {
+            color: rgba(255,255,255,.75); padding: .6rem 1rem;
+            border-radius: 6px; margin: 2px 8px;
+            transition: all .2s;
+        }
+        .sidebar .nav-link:hover, .sidebar .nav-link.active {
+            background: rgba(255,255,255,.15); color: white;
+        }
+        .sidebar .nav-section {
+            font-size: .7rem; text-transform: uppercase; letter-spacing: 1px;
+            color: rgba(255,255,255,.4); padding: .5rem 1rem .2rem;
+        }
+        .main-content { margin-left: 240px; min-height: 100vh; }
+        .topbar {
+            background: white; border-bottom: 1px solid #e0e0e0;
+            padding: .75rem 1.5rem;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .content-area { padding: 1.5rem; }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+    <a class="sidebar-brand" href="{% url 'dashboard:index' %}">
+        <i class="bi bi-hospital fs-4"></i> ClinicMS
+    </a>
+
+    <div class="mt-2">
+        <div class="nav-section">Tổng quan</div>
+        <a href="{% url 'dashboard:index' %}" class="nav-link {% if request.resolver_match.app_name == 'dashboard' %}active{% endif %}">
+            <i class="bi bi-speedometer2 me-2"></i>Dashboard
+        </a>
+
+        {# ── ADMIN & STAFF: thấy quản lý đầy đủ ── #}
+        {% if is_admin_or_staff %}
+        <div class="nav-section mt-2">Quản lý</div>
+        <a href="{% url 'patients:list' %}" class="nav-link {% if request.resolver_match.app_name == 'patients' %}active{% endif %}">
+            <i class="bi bi-people-fill me-2"></i>Bệnh nhân
+        </a>
+        <a href="{% url 'doctors:list' %}" class="nav-link {% if request.resolver_match.app_name == 'doctors' %}active{% endif %}">
+            <i class="bi bi-person-badge-fill me-2"></i>Bác sĩ
+        </a>
+        <a href="{% url 'appointments:list' %}" class="nav-link {% if request.resolver_match.app_name == 'appointments' %}active{% endif %}">
+            <i class="bi bi-calendar3 me-2"></i>Lịch hẹn
+        </a>
+
+        <div class="nav-section mt-2">Tạo nhanh</div>
+        <a href="{% url 'appointments:create' %}" class="nav-link">
+            <i class="bi bi-plus-circle me-2"></i>Tạo lịch hẹn
+        </a>
+        <a href="{% url 'patients:create' %}" class="nav-link">
+            <i class="bi bi-person-plus me-2"></i>Thêm bệnh nhân
+        </a>
+        {% if is_admin %}
+        <a href="{% url 'doctors:create' %}" class="nav-link">
+            <i class="bi bi-person-badge me-2"></i>Thêm bác sĩ
+        </a>
+        {% endif %}
+        {% endif %}
+
+        {# ── BÁC SĨ: chỉ thấy lịch của mình ── #}
+        {% if is_doctor %}
+        <div class="nav-section mt-2">Lịch khám</div>
+        <a href="{% url 'appointments:my_schedule' %}" class="nav-link {% if request.resolver_match.url_name == 'my_schedule' %}active{% endif %}">
+            <i class="bi bi-calendar-week-fill me-2"></i>Lịch của tôi
+        </a>
+        <a href="{% url 'appointments:list' %}" class="nav-link {% if request.resolver_match.app_name == 'appointments' and request.resolver_match.url_name != 'my_schedule' %}active{% endif %}">
+            <i class="bi bi-calendar3 me-2"></i>Tất cả lịch hẹn
+        </a>
+        {% endif %}
+    </div>
+</nav>
+
+
+
+<!-- Main content -->
+<div class="main-content">
+    <!-- Topbar -->
+    <div class="topbar">
+        <h6 class="mb-0 fw-semibold text-muted">{% block page_title %}{% endblock %}</h6>
+        <div class="d-flex align-items-center gap-3">
+            {% if request.user.is_authenticated %}
+            <span class="text-muted small">
+                <i class="bi bi-person-circle me-1"></i>
+                {{ request.user.get_full_name|default:request.user.username }}
+                {% if request.user.profile %}
+                <span class="badge bg-secondary ms-1">{{ request.user.profile.get_role_display }}</span>
+                {% endif %}
+            </span>
+            <form method="post" action="{% url 'accounts:logout' %}" class="mb-0">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger btn-sm">
+                    <i class="bi bi-box-arrow-right me-1"></i>Đăng xuất
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Content area -->
+    <div class="content-area">
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>
