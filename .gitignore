@@ -1,24 +1,25 @@
-# Python
+# Python cache and build artifacts
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
-.Python
 *.pyc
 
-# Django
+# Django database and local config
+*.sqlite3
+db.sqlite3
 *.log
 local_settings.py
-db.sqlite3          # Database không push lên GitHub (mỗi người tạo riêng)
 media/
+.env
 
-# Môi trường ảo
+# Virtual environments
 venv/
-env/
 .venv/
 ENV/
+env/
 
-# IDE
+# IDE and OS files
 .idea/
 .vscode/
 *.swp
