@@ -1,4 +1,4 @@
-# ClinicMS - Quản lý phòng khám
+# ClinicMS - Quản lý phòng khám.
 
 Ứng dụng quản lý phòng khám bằng Django, hỗ trợ quản lý bệnh nhân, bác sĩ, lịch hẹn và dashboard.
 
