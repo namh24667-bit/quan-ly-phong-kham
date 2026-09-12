@@ -1,11 +1,11 @@
-# Python cache and build artifacts
+# Python cache and build artifacts.
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
 *.pyc
 
-# Django database and local config
+# Django database and local config.
 *.sqlite3
 db.sqlite3
 *.log
@@ -13,13 +13,13 @@ local_settings.py
 media/
 .env
 
-# Virtual environments
+# Virtual environments.
 venv/
 .venv/
 ENV/
 env/
 
-# IDE and OS files
+# IDE and OS files.
 .idea/
 .vscode/
 *.swp
