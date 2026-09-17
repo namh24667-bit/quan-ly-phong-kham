@@ -70,13 +70,13 @@ Mở trình duyệt tại:
 http://127.0.0.1:8000/
 ```
 
-## Tài khoản mẫu.
+## Tài khoản  mẫu 
 
 - Admin: `admin / admin123`
 - Nhân viên: `nhanvien / nhanvien123`
 - Bác sĩ An: `bacsi_an / bacsi123`
 
-## Lưu ý.
+## Lưu ý
 
 - File `db.sqlite3` và môi trường ảo đã được đưa vào `.gitignore` để tránh commit nhầm.
 - Nếu cần chạy lại từ đầu, xóa file `db.sqlite3` local và chạy lại migration.
