@@ -3,8 +3,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
 from accounts.decorators import role_required
-from .models import Appointment
-from .forms import AppointmentForm
+from .models import Appointment, MedicalRecord
+from .forms import AppointmentForm, MedicalRecordForm
 from .utils import check_appointment_conflict
 
 
@@ -172,4 +172,28 @@ def my_schedule(request):
         grouped[appt.date].append(appt)
     return render(request, 'appointments/my_schedule.html', {
         'doctor': doctor, 'grouped_appointments': grouped, 'today': today,
+    })
+
+
+# ─── TẠO HỒ SƠ KHÁM BỆNH ────────────────────────────────────────
+@login_required
+@role_required('doctor')
+def create_medical_record(request):
+    if not hasattr(request.user, 'doctor'):
+        messages.error(request, 'Tài khoản chưa được liên kết với hồ sơ bác sĩ.')
+        return redirect('appointments:my_schedule')
+
+    doctor = request.user.doctor
+    if request.method == 'POST':
+        form = MedicalRecordForm(request.POST, doctor=doctor)
+        if form.is_valid():
+            record = form.save()
+            messages.success(request, f'Đã tạo hồ sơ khám cho {record.appointment.patient.full_name}.')
+            return redirect('appointments:detail', pk=record.appointment.pk)
+    else:
+        form = MedicalRecordForm(doctor=doctor)
+
+    return render(request, 'appointments/create_medical_record.html', {
+        'form': form,
+        'title': 'Tạo hồ sơ khám bệnh',
     })

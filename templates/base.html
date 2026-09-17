@@ -90,6 +90,9 @@
         <a href="{% url 'appointments:list' %}" class="nav-link {% if request.resolver_match.app_name == 'appointments' and request.resolver_match.url_name != 'my_schedule' %}active{% endif %}">
             <i class="bi bi-calendar3 me-2"></i>Tất cả lịch hẹn
         </a>
+        <a href="{% url 'medical_record_create' %}" class="nav-link {% if request.resolver_match.url_name == 'medical_record_create' %}active{% endif %}">
+            <i class="bi bi-file-medical me-2"></i>Tạo hồ sơ khám
+        </a>
         {% endif %}
     </div>
 </nav>

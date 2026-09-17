@@ -13,4 +13,5 @@ urlpatterns = [
     path('<int:pk>/done/', views.appointment_done, name='done'),
     path('<int:pk>/cancel/', views.appointment_cancel, name='cancel'),
     path('my-schedule/', views.my_schedule, name='my_schedule'),
+    path('medical-records/create/', views.create_medical_record, name='medical_record_create'),
 ]
