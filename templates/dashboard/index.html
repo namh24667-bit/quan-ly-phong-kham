@@ -20,6 +20,15 @@
         </div>
     </div>
     <div class="col-md-6 col-xl-3">
+        <div class="card text-white border-0 shadow-sm" style="background:linear-gradient(135deg,#6f42c1,#59359a)">
+            <div class="card-body d-flex align-items-center">
+                <div class="flex-grow-1"><p class="mb-1 opacity-75 small">Tổng Doanh Thu</p><h2 class="fw-bold mb-0">{{ stats.paid_revenue|floatformat:0 }} đ</h2></div>
+                <i class="bi bi-cash-stack fs-1 opacity-50"></i>
+            </div>
+            <div class="card-footer bg-transparent border-0 pt-0"><a href="{% url 'billing:list' %}?status=Paid" class="text-white-50 small text-decoration-none">Hóa đơn đã thanh toán <i class="bi bi-arrow-right"></i></a></div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
         <div class="card text-white border-0 shadow-sm" style="background:linear-gradient(135deg,#198754,#146c43)">
             <div class="card-body d-flex align-items-center">
                 <div class="flex-grow-1">

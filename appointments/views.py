@@ -1,11 +1,14 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db import transaction
 from django.utils import timezone
 from accounts.decorators import role_required
 from .models import Appointment, MedicalRecord
 from .forms import AppointmentForm, MedicalRecordForm
 from .utils import check_appointment_conflict
+from billing.forms import PrescriptionFormSet
+from billing.models import Invoice
 
 
 # ─── TẠO LỊCH HẸN ────────────────────────────────────────────────
@@ -186,14 +189,48 @@ def create_medical_record(request):
     doctor = request.user.doctor
     if request.method == 'POST':
         form = MedicalRecordForm(request.POST, doctor=doctor)
-        if form.is_valid():
-            record = form.save()
+        prescription_formset = PrescriptionFormSet(request.POST)
+        if form.is_valid() and prescription_formset.is_valid():
+            with transaction.atomic():
+                record = form.save()
+                prescription_formset.instance = record
+                prescription_formset.save()
+                Invoice.objects.create(medical_record=record).recalculate()
             messages.success(request, f'Đã tạo hồ sơ khám cho {record.appointment.patient.full_name}.')
             return redirect('appointments:detail', pk=record.appointment.pk)
     else:
         form = MedicalRecordForm(doctor=doctor)
+        prescription_formset = PrescriptionFormSet()
 
     return render(request, 'appointments/create_medical_record.html', {
         'form': form,
+        'prescription_formset': prescription_formset,
         'title': 'Tạo hồ sơ khám bệnh',
+    })
+
+
+@login_required
+@role_required('doctor')
+def update_medical_record(request, pk):
+    record = get_object_or_404(MedicalRecord.objects.select_related('appointment__doctor'), pk=pk)
+    if record.appointment.doctor != request.user.doctor:
+        messages.error(request, 'Bạn chỉ được chỉnh sửa hồ sơ của mình.')
+        return redirect('appointments:detail', pk=record.appointment.pk)
+    if request.method == 'POST':
+        form = MedicalRecordForm(request.POST, instance=record, doctor=request.user.doctor)
+        prescription_formset = PrescriptionFormSet(request.POST, instance=record)
+        if form.is_valid() and prescription_formset.is_valid():
+            with transaction.atomic():
+                form.save()
+                prescription_formset.save()
+                Invoice.objects.get_or_create(medical_record=record)
+                record.invoice.recalculate()
+            messages.success(request, 'Đã cập nhật hồ sơ và đơn thuốc.')
+            return redirect('appointments:detail', pk=record.appointment.pk)
+    else:
+        form = MedicalRecordForm(instance=record, doctor=request.user.doctor)
+        prescription_formset = PrescriptionFormSet(instance=record)
+    return render(request, 'appointments/create_medical_record.html', {
+        'form': form, 'prescription_formset': prescription_formset,
+        'title': 'Chỉnh sửa hồ sơ khám bệnh', 'record': record,
     })

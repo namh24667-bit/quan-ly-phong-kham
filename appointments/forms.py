@@ -53,13 +53,13 @@ class MedicalRecordForm(forms.ModelForm):
 
     def __init__(self, *args, doctor=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['appointment'].queryset = Appointment.objects.filter(
-            doctor=doctor,
-            medical_record__isnull=True,
-        ).select_related('patient').order_by('-date', '-start_time')
+        queryset = Appointment.objects.filter(doctor=doctor).select_related('patient')
+        if not self.instance.pk:
+            queryset = queryset.filter(medical_record__isnull=True)
+        self.fields['appointment'].queryset = queryset.order_by('-date', '-start_time')
 
     def clean_appointment(self):
         appointment = self.cleaned_data['appointment']
-        if hasattr(appointment, 'medical_record'):
+        if hasattr(appointment, 'medical_record') and appointment.medical_record != self.instance:
             raise forms.ValidationError('Lịch hẹn này đã có hồ sơ khám bệnh.')
         return appointment

@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}Hóa đơn – ClinicMS{% endblock %}
+{% block page_title %}Quản lý hóa đơn{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="bi bi-receipt text-primary me-2"></i>Danh sách hóa đơn</h4>
+    <div class="btn-group btn-group-sm">
+        <a href="{% url 'billing:list' %}" class="btn btn-outline-secondary">Tất cả</a>
+        <a href="?status=Pending" class="btn btn-outline-warning">Chờ thanh toán</a>
+        <a href="?status=Paid" class="btn btn-outline-success">Đã thanh toán</a>
+    </div>
+</div>
+<div class="card shadow-sm"><div class="table-responsive"><table class="table table-hover mb-0">
+<thead class="table-light"><tr><th>Mã</th><th>Bệnh nhân</th><th>Ngày tạo</th><th>Tổng tiền</th><th>Trạng thái</th><th></th></tr></thead>
+<tbody>
+{% for invoice in invoices %}<tr>
+<td>#{{ invoice.pk }}</td><td>{{ invoice.medical_record.appointment.patient.full_name }}</td>
+<td>{{ invoice.created_at|date:'d/m/Y H:i' }}</td><td class="fw-semibold">{{ invoice.total_amount|floatformat:0 }} đ</td>
+<td><span class="badge bg-{% if invoice.status == 'Paid' %}success{% else %}warning text-dark{% endif %}">{{ invoice.get_status_display }}</span></td>
+<td><a href="{% url 'billing:detail' invoice.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a></td>
+</tr>{% empty %}<tr><td colspan="6" class="text-center text-muted py-4">Chưa có hóa đơn.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

@@ -9,7 +9,7 @@ urlpatterns = [
     path('patients/', include('patients.urls')),
     path('doctors/', include('doctors.urls')),
     path('appointments/', include('appointments.urls')),
+    path('billing/', include('billing.urls')),
     path('dashboard/', include('dashboard.urls')),
-    path('medical-records/create/', create_medical_record, name='medical_record_create'),
     path('', RedirectView.as_view(url='/dashboard/', permanent=False)),
 ]

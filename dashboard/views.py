@@ -8,6 +8,8 @@ def dashboard_index(request):
     from patients.models import Patient
     from doctors.models import Doctor
     from appointments.models import Appointment
+    from billing.models import Invoice
+    from django.db.models import Sum
     from datetime import timedelta
 
     today = timezone.localdate()
@@ -19,6 +21,7 @@ def dashboard_index(request):
         'pending_count':     Appointment.objects.filter(status='pending').count(),
         'confirmed_today':   Appointment.objects.filter(date=today, status='confirmed').count(),
         'done_total':        Appointment.objects.filter(status='done').count(),
+        'paid_revenue':      Invoice.objects.filter(status='Paid').aggregate(total=Sum('total_amount'))['total'] or 0,
     }
 
     appointments_today = Appointment.objects.filter(

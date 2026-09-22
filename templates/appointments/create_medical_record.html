@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
-{% block title %}Tạo hồ sơ khám bệnh – ClinicMS{% endblock %}
-{% block page_title %}Tạo hồ sơ khám bệnh{% endblock %}
+{% block title %}{{ title }} – ClinicMS{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -23,6 +23,19 @@
                         </label>
                         {{ field }}
                         {% if field.errors %}<div class="text-danger small mt-1">{{ field.errors.0 }}</div>{% endif %}
+                    </div>
+                    {% endfor %}
+                    <hr>
+                    <h5 class="mb-3"><i class="bi bi-capsule text-success me-2"></i>Đơn thuốc</h5>
+                    {{ prescription_formset.management_form }}
+                    {% for prescription_form in prescription_formset %}
+                    <div class="row g-2 align-items-end mb-3">
+                        <div class="col-md-5"><label class="form-label">{{ prescription_form.medicine.label }}</label>{{ prescription_form.medicine }}</div>
+                        <div class="col-md-2"><label class="form-label">{{ prescription_form.quantity.label }}</label>{{ prescription_form.quantity }}</div>
+                        <div class="col-md-5"><label class="form-label">{{ prescription_form.dosage.label }}</label>{{ prescription_form.dosage }}</div>
+                        {% if prescription_form.instance.pk %}<div class="col-12">{{ prescription_form.DELETE }} Xóa thuốc này</div>{% endif %}
+                        {% for hidden in prescription_form.hidden_fields %}{{ hidden }}{% endfor %}
+                        {% if prescription_form.errors %}<div class="text-danger small">{{ prescription_form.errors }}</div>{% endif %}
                     </div>
                     {% endfor %}
                     <div class="d-flex justify-content-end gap-2 mt-4">
