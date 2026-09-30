@@ -141,11 +141,15 @@ def appointment_checkin(request, pk):
 
 # ─── HOÀN THÀNH (checked_in -> done) ─────────────────────────────
 @login_required
-@role_required('admin')
+@role_required('admin', 'doctor')
 def appointment_done(request, pk):
     if request.method != 'POST':
         return redirect('appointments:list')
     appointment = get_object_or_404(Appointment, pk=pk)
+    if (not request.user.is_superuser
+            and request.user.profile.role == 'doctor'
+            and appointment.doctor.user != request.user):
+        raise PermissionDenied
     if appointment.status != 'checked_in':
         messages.error(request, f'Phải ở trạng thái "Đã check-in" mới hoàn thành được.')
         return redirect('appointments:detail', pk=pk)
@@ -203,9 +207,27 @@ def create_medical_record(request):
             raise PermissionDenied
         doctor = request.user.doctor
     if request.method == 'POST':
+        try:
+            appointment = Appointment.objects.filter(
+                pk=request.POST.get('appointment')
+            ).first()
+        except (TypeError, ValueError):
+            appointment = None
+        if appointment is not None:
+            if doctor is not None and appointment.doctor != doctor:
+                raise PermissionDenied
+            if (appointment.status != 'checked_in'
+                    or MedicalRecord.objects.filter(appointment=appointment).exists()):
+                raise PermissionDenied
         form = MedicalRecordForm(request.POST, doctor=doctor)
         prescription_formset = PrescriptionFormSet(request.POST)
         if form.is_valid() and prescription_formset.is_valid():
+            appointment = form.cleaned_data['appointment']
+            if doctor is not None and appointment.doctor != doctor:
+                raise PermissionDenied
+            if (appointment.status != 'checked_in'
+                    or MedicalRecord.objects.filter(appointment=appointment).exists()):
+                raise PermissionDenied
             with transaction.atomic():
                 record = form.save()
                 prescription_formset.instance = record

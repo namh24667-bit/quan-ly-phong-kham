@@ -56,8 +56,12 @@ class MedicalRecordForm(forms.ModelForm):
         queryset = Appointment.objects.select_related('patient')
         if doctor is not None:
             queryset = queryset.filter(doctor=doctor)
-        if not self.instance.pk:
-            queryset = queryset.filter(medical_record__isnull=True)
+        if self.instance.pk:
+            queryset = queryset.filter(pk=self.instance.appointment_id)
+        else:
+            queryset = queryset.filter(
+                status='checked_in', medical_record__isnull=True,
+            )
         self.fields['appointment'].queryset = queryset.order_by('-date', '-start_time')
 
     def clean_appointment(self):

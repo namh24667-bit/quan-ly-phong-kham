@@ -44,7 +44,7 @@ class BackendPermissionTests(TestCase):
         self.other_invoice = Invoice.objects.create(medical_record=self.other_record)
 
     def make_user(self, username, role):
-        user = User.objects.create_user(username=username, password='password')
+        user = User.objects.create_user(username=username)
         user.profile.role = role
         user.profile.save()
         return user
@@ -58,6 +58,19 @@ class BackendPermissionTests(TestCase):
             end_time=time(hour, 30),
             status=status,
         )
+
+    def medical_record_data(self, appointment):
+        return {
+            'appointment': appointment.pk,
+            'symptoms': 'Symptoms',
+            'diagnosis': 'Diagnosis',
+            'treatment': 'Treatment',
+            'notes': '',
+            'prescriptions-TOTAL_FORMS': '0',
+            'prescriptions-INITIAL_FORMS': '0',
+            'prescriptions-MIN_NUM_FORMS': '0',
+            'prescriptions-MAX_NUM_FORMS': '1000',
+        }
 
     def test_doctor_only_sees_own_appointments(self):
         self.client.force_login(self.doctor_user)
@@ -99,7 +112,7 @@ class BackendPermissionTests(TestCase):
         self.assertEqual(own_response.status_code, 200)
         self.assertEqual(other_response.status_code, 403)
 
-    def test_doctor_cannot_change_appointment_status(self):
+    def test_doctor_cannot_skip_appointment_workflow(self):
         self.client.force_login(self.doctor_user)
 
         for name in ['confirm', 'checkin', 'done', 'cancel']:
@@ -155,3 +168,110 @@ class BackendPermissionTests(TestCase):
         self.assertEqual(response.context['stats']['total_patients'], 1)
         self.assertEqual(response.context['stats']['appointments_today'], 1)
         self.assertQuerySetEqual(response.context['appointments_today'], [self.appointment])
+
+    def test_pending_cannot_change_directly_to_done(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(reverse('appointments:done', args=[self.appointment.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        self.appointment.refresh_from_db()
+        self.assertEqual(self.appointment.status, 'pending')
+
+    def test_confirmed_changes_to_checked_in_for_staff(self):
+        appointment = self.make_appointment(self.patient, self.doctor, 'confirmed', 11)
+        self.client.force_login(self.staff)
+
+        response = self.client.post(reverse('appointments:checkin', args=[appointment.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, 'checked_in')
+
+    def test_confirmed_cannot_change_directly_to_done(self):
+        appointment = self.make_appointment(self.patient, self.doctor, 'confirmed', 12)
+        self.client.force_login(self.admin)
+
+        response = self.client.post(reverse('appointments:done', args=[appointment.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, 'confirmed')
+
+    def test_doctor_finishes_own_checked_in_appointment(self):
+        appointment = self.make_appointment(self.patient, self.doctor, 'checked_in', 13)
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.post(reverse('appointments:done', args=[appointment.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, 'done')
+
+    def test_doctor_cannot_finish_another_doctors_appointment(self):
+        appointment = self.make_appointment(
+            self.other_patient, self.other_doctor, 'checked_in', 14,
+        )
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.post(reverse('appointments:done', args=[appointment.pk]))
+
+        self.assertEqual(response.status_code, 403)
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, 'checked_in')
+
+    def test_cancelled_appointment_cannot_change_status(self):
+        appointment = self.make_appointment(self.patient, self.doctor, 'cancelled', 15)
+        self.client.force_login(self.admin)
+
+        for name in ['confirm', 'checkin', 'done']:
+            response = self.client.post(reverse(f'appointments:{name}', args=[appointment.pk]))
+            self.assertEqual(response.status_code, 302)
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, 'cancelled')
+
+    def test_only_checked_in_appointment_can_create_medical_record(self):
+        pending = self.make_appointment(self.patient, self.doctor, 'pending', 16)
+        checked_in = self.make_appointment(self.patient, self.doctor, 'checked_in', 17)
+        self.client.force_login(self.doctor_user)
+
+        denied_response = self.client.post(
+            reverse('appointments:medical_record_create'),
+            self.medical_record_data(pending),
+        )
+        success_response = self.client.post(
+            reverse('appointments:medical_record_create'),
+            self.medical_record_data(checked_in),
+        )
+
+        self.assertEqual(denied_response.status_code, 403)
+        self.assertEqual(success_response.status_code, 302)
+        self.assertFalse(MedicalRecord.objects.filter(appointment=pending).exists())
+        self.assertTrue(MedicalRecord.objects.filter(appointment=checked_in).exists())
+
+    def test_doctor_cannot_create_medical_record_for_another_doctor(self):
+        appointment = self.make_appointment(
+            self.other_patient, self.other_doctor, 'checked_in', 18,
+        )
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.post(
+            reverse('appointments:medical_record_create'),
+            self.medical_record_data(appointment),
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(MedicalRecord.objects.filter(appointment=appointment).exists())
+
+    def test_appointment_cannot_have_second_medical_record(self):
+        self.appointment.status = 'checked_in'
+        self.appointment.save(update_fields=['status'])
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.post(
+            reverse('appointments:medical_record_create'),
+            self.medical_record_data(self.appointment),
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(MedicalRecord.objects.filter(appointment=self.appointment).count(), 1)
