@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -25,6 +26,7 @@ def invoice_list(request):
 
 
 @login_required
+@role_required('admin', 'staff', 'doctor')
 def invoice_detail(request, pk):
     invoice = get_object_or_404(
         Invoice.objects.select_related(
@@ -33,6 +35,10 @@ def invoice_detail(request, pk):
         ).prefetch_related('services', 'medical_record__prescriptions__medicine'),
         pk=pk,
     )
+    if (not request.user.is_superuser
+            and request.user.profile.role == 'doctor'
+            and invoice.medical_record.appointment.doctor.user != request.user):
+        raise PermissionDenied
     return render(request, 'billing/invoice_detail.html', {'invoice': invoice})
 
 

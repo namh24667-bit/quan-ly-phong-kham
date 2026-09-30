@@ -53,7 +53,9 @@ class MedicalRecordForm(forms.ModelForm):
 
     def __init__(self, *args, doctor=None, **kwargs):
         super().__init__(*args, **kwargs)
-        queryset = Appointment.objects.filter(doctor=doctor).select_related('patient')
+        queryset = Appointment.objects.select_related('patient')
+        if doctor is not None:
+            queryset = queryset.filter(doctor=doctor)
         if not self.instance.pk:
             queryset = queryset.filter(medical_record__isnull=True)
         self.fields['appointment'].queryset = queryset.order_by('-date', '-start_time')

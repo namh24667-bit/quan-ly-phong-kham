@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Q
 from accounts.decorators import role_required
@@ -9,10 +10,14 @@ from .forms import PatientForm
 
 
 @login_required
-@role_required('admin', 'staff')
+@role_required('admin', 'staff', 'doctor')
 def patient_list(request):
     query = request.GET.get('q', '').strip()
     patients = Patient.objects.all()
+    if not request.user.is_superuser and request.user.profile.role == 'doctor':
+        if not hasattr(request.user, 'doctor'):
+            raise PermissionDenied
+        patients = patients.filter(appointment__doctor=request.user.doctor).distinct()
     if query:
         patients = patients.filter(
             Q(full_name__icontains=query) | Q(phone__icontains=query)
@@ -76,10 +81,14 @@ def patient_delete(request, pk):
 @role_required('admin', 'staff', 'doctor')
 def patient_detail(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
-    try:
-        appointments = patient.appointment_set.select_related('doctor').order_by('-date', '-start_time')
-    except Exception:
-        appointments = []
+    appointments = patient.appointment_set.select_related('doctor')
+    if not request.user.is_superuser and request.user.profile.role == 'doctor':
+        if not hasattr(request.user, 'doctor'):
+            raise PermissionDenied
+        appointments = appointments.filter(doctor=request.user.doctor)
+        if not appointments.exists():
+            raise PermissionDenied
+    appointments = appointments.order_by('-date', '-start_time')
     return render(request, 'patients/patient_detail.html', {
         'patient': patient, 'appointments': appointments,
     })

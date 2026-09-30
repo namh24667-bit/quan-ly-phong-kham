@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.utils import timezone
 from accounts.decorators import role_required
@@ -71,8 +72,13 @@ def appointment_update(request, pk):
 
 # ─── DANH SÁCH LỊCH HẸN ──────────────────────────────────────────
 @login_required
+@role_required('admin', 'staff', 'doctor')
 def appointment_list(request):
     appointments = Appointment.objects.select_related('patient', 'doctor').order_by('-date', '-start_time')
+    if not request.user.is_superuser and request.user.profile.role == 'doctor':
+        if not hasattr(request.user, 'doctor'):
+            raise PermissionDenied
+        appointments = appointments.filter(doctor=request.user.doctor)
     status_filter = request.GET.get('status', '')
     date_filter   = request.GET.get('date', '')
     if status_filter:
@@ -89,15 +95,21 @@ def appointment_list(request):
 
 # ─── CHI TIẾT LỊCH HẸN ───────────────────────────────────────────
 @login_required
+@role_required('admin', 'staff', 'doctor')
 def appointment_detail(request, pk):
     appointment = get_object_or_404(
         Appointment.objects.select_related('patient', 'doctor'), pk=pk
     )
+    if (not request.user.is_superuser
+            and request.user.profile.role == 'doctor'
+            and appointment.doctor.user != request.user):
+        raise PermissionDenied
     return render(request, 'appointments/appointment_detail.html', {'appointment': appointment})
 
 
 # ─── XÁC NHẬN (pending -> confirmed) ─────────────────────────────
 @login_required
+@role_required('admin', 'staff')
 def appointment_confirm(request, pk):
     if request.method != 'POST':
         return redirect('appointments:list')
@@ -113,6 +125,7 @@ def appointment_confirm(request, pk):
 
 # ─── CHECK-IN (confirmed -> checked_in) ──────────────────────────
 @login_required
+@role_required('admin', 'staff')
 def appointment_checkin(request, pk):
     if request.method != 'POST':
         return redirect('appointments:list')
@@ -128,6 +141,7 @@ def appointment_checkin(request, pk):
 
 # ─── HOÀN THÀNH (checked_in -> done) ─────────────────────────────
 @login_required
+@role_required('admin')
 def appointment_done(request, pk):
     if request.method != 'POST':
         return redirect('appointments:list')
@@ -143,6 +157,7 @@ def appointment_done(request, pk):
 
 # ─── HỦY LỊCH ────────────────────────────────────────────────────
 @login_required
+@role_required('admin', 'staff')
 def appointment_cancel(request, pk):
     if request.method != 'POST':
         return redirect('appointments:list')
@@ -159,10 +174,10 @@ def appointment_cancel(request, pk):
 
 # ─── LỊCH CỦA BÁC SĨ ĐANG ĐĂNG NHẬP ─────────────────────────────
 @login_required
+@role_required('doctor')
 def my_schedule(request):
     if not hasattr(request.user, 'doctor'):
-        messages.error(request, 'Trang này chỉ dành cho bác sĩ.')
-        return redirect('appointments:list')
+        raise PermissionDenied
     doctor = request.user.doctor
     today  = timezone.localdate()
     appointments = Appointment.objects.filter(
@@ -180,13 +195,13 @@ def my_schedule(request):
 
 # ─── TẠO HỒ SƠ KHÁM BỆNH ────────────────────────────────────────
 @login_required
-@role_required('doctor')
+@role_required('admin', 'doctor')
 def create_medical_record(request):
-    if not hasattr(request.user, 'doctor'):
-        messages.error(request, 'Tài khoản chưa được liên kết với hồ sơ bác sĩ.')
-        return redirect('appointments:my_schedule')
-
-    doctor = request.user.doctor
+    doctor = None
+    if not request.user.is_superuser and request.user.profile.role == 'doctor':
+        if not hasattr(request.user, 'doctor'):
+            raise PermissionDenied
+        doctor = request.user.doctor
     if request.method == 'POST':
         form = MedicalRecordForm(request.POST, doctor=doctor)
         prescription_formset = PrescriptionFormSet(request.POST)
@@ -210,14 +225,18 @@ def create_medical_record(request):
 
 
 @login_required
-@role_required('doctor')
+@role_required('admin', 'doctor')
 def update_medical_record(request, pk):
     record = get_object_or_404(MedicalRecord.objects.select_related('appointment__doctor'), pk=pk)
-    if record.appointment.doctor != request.user.doctor:
-        messages.error(request, 'Bạn chỉ được chỉnh sửa hồ sơ của mình.')
-        return redirect('appointments:detail', pk=record.appointment.pk)
+    doctor = None
+    if not request.user.is_superuser and request.user.profile.role == 'doctor':
+        if not hasattr(request.user, 'doctor'):
+            raise PermissionDenied
+        doctor = request.user.doctor
+        if record.appointment.doctor != doctor:
+            raise PermissionDenied
     if request.method == 'POST':
-        form = MedicalRecordForm(request.POST, instance=record, doctor=request.user.doctor)
+        form = MedicalRecordForm(request.POST, instance=record, doctor=doctor)
         prescription_formset = PrescriptionFormSet(request.POST, instance=record)
         if form.is_valid() and prescription_formset.is_valid():
             with transaction.atomic():
@@ -228,7 +247,7 @@ def update_medical_record(request, pk):
             messages.success(request, 'Đã cập nhật hồ sơ và đơn thuốc.')
             return redirect('appointments:detail', pk=record.appointment.pk)
     else:
-        form = MedicalRecordForm(instance=record, doctor=request.user.doctor)
+        form = MedicalRecordForm(instance=record, doctor=doctor)
         prescription_formset = PrescriptionFormSet(instance=record)
     return render(request, 'appointments/create_medical_record.html', {
         'form': form, 'prescription_formset': prescription_formset,

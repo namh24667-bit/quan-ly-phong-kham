@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.db.models import Q, Count
 from accounts.decorators import role_required
 from .models import Doctor
@@ -84,13 +85,14 @@ def doctor_delete(request, pk):
 @role_required('admin', 'staff', 'doctor')
 def doctor_detail(request, pk):
     doctor = get_object_or_404(Doctor, pk=pk)
-    try:
-        from appointments.models import Appointment
-        appointments = Appointment.objects.filter(
-            doctor=doctor
-        ).select_related('patient').order_by('-date', '-start_time')[:20]
-    except Exception:
-        appointments = []
+    if (not request.user.is_superuser
+            and request.user.profile.role == 'doctor'
+            and doctor.user != request.user):
+        raise PermissionDenied
+    from appointments.models import Appointment
+    appointments = Appointment.objects.filter(
+        doctor=doctor
+    ).select_related('patient').order_by('-date', '-start_time')[:20]
     return render(request, 'doctors/doctor_detail.html', {
         'doctor': doctor, 'appointments': appointments,
     })
