@@ -33,7 +33,7 @@
                     <td class="text-center">
                         <a href="{% url 'doctors:detail' pk=d.pk %}" class="btn btn-sm btn-outline-info"><i class="bi bi-eye"></i></a>
                         <a href="{% url 'doctors:update' pk=d.pk %}" class="btn btn-sm btn-outline-warning"><i class="bi bi-pencil"></i></a>
-                        <a href="{% url 'doctors:delete' pk=d.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                        {% if d.is_active %}<a href="{% url 'doctors:delete' pk=d.pk %}" class="btn btn-sm btn-outline-warning" title="Ngừng hoạt động"><i class="bi bi-pause-circle"></i></a>{% endif %}
                     </td>
                 </tr>
                 {% empty %}

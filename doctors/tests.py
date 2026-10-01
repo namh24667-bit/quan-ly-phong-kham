@@ -1,9 +1,15 @@
-from datetime import time
+from datetime import date, time
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.db.models.deletion import ProtectedError
 from django.test import TestCase
 from django.urls import reverse
+
+from appointments.forms import AppointmentForm
+from appointments.models import Appointment, MedicalRecord
+from billing.models import Invoice, Medicine, Prescription
+from patients.models import Patient
 
 from .models import Doctor, DoctorSchedule
 
@@ -155,3 +161,109 @@ class DoctorSchedulePermissionTests(TestCase):
                 self.assertEqual(deactivate_response.status_code, 302)
                 schedule.refresh_from_db()
                 self.assertFalse(schedule.is_active)
+
+
+class DoctorDeactivateTests(TestCase):
+    def setUp(self):
+        self.staff = User.objects.create_user(username='staff')
+        self.staff.profile.role = 'staff'
+        self.staff.profile.save()
+        self.doctor_user = User.objects.create_user(username='doctor')
+        self.doctor_user.profile.role = 'doctor'
+        self.doctor_user.profile.save()
+        self.doctor = Doctor.objects.create(
+            user=self.doctor_user, full_name='Doctor A', specialty='General'
+        )
+        self.patient = Patient.objects.create(
+            full_name='Patient A', date_of_birth='1990-01-01',
+            gender='M', phone='0900000001',
+        )
+        self.schedule = DoctorSchedule.objects.create(
+            doctor=self.doctor, weekday=0,
+            start_time=time(8), end_time=time(12),
+        )
+        self.done_appointment = Appointment.objects.create(
+            patient=self.patient, doctor=self.doctor, date=date(2026, 10, 5),
+            start_time=time(9), end_time=time(10), status='done',
+        )
+        self.cancelled_appointment = Appointment.objects.create(
+            patient=self.patient, doctor=self.doctor, date=date(2026, 10, 6),
+            start_time=time(9), end_time=time(10), status='cancelled',
+        )
+        self.pending_appointment = Appointment.objects.create(
+            patient=self.patient, doctor=self.doctor, date=date(2026, 10, 7),
+            start_time=time(9), end_time=time(10), status='pending',
+        )
+        self.confirmed_appointment = Appointment.objects.create(
+            patient=self.patient, doctor=self.doctor, date=date(2026, 10, 8),
+            start_time=time(9), end_time=time(10), status='confirmed',
+        )
+        self.record = MedicalRecord.objects.create(
+            appointment=self.done_appointment, symptoms='A',
+            diagnosis='Diagnosis A', treatment='Treatment A',
+        )
+        medicine = Medicine.objects.create(
+            name='Medicine A', unit_price='10000', unit='Viên'
+        )
+        self.prescription = Prescription.objects.create(
+            medical_record=self.record, medicine=medicine,
+            quantity=2, dosage='Ngày 2 lần',
+        )
+        self.invoice = Invoice.objects.create(medical_record=self.record)
+
+    def deactivate_doctor(self):
+        self.client.force_login(self.staff)
+        return self.client.post(reverse('doctors:delete', args=[self.doctor.pk]))
+
+    def test_doctor_is_active_by_default(self):
+        doctor = Doctor.objects.create(full_name='Doctor B', specialty='General')
+
+        self.assertTrue(doctor.is_active)
+
+    def test_deactivate_keeps_doctor_and_user_account(self):
+        response = self.deactivate_doctor()
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Doctor.objects.filter(pk=self.doctor.pk).exists())
+        self.doctor.refresh_from_db()
+        self.doctor_user.refresh_from_db()
+        self.assertFalse(self.doctor.is_active)
+        self.assertTrue(User.objects.filter(pk=self.doctor_user.pk).exists())
+        self.assertTrue(self.doctor_user.is_active)
+
+    def test_deactivate_preserves_history_and_schedule(self):
+        self.deactivate_doctor()
+
+        self.assertTrue(Appointment.objects.filter(pk=self.done_appointment.pk).exists())
+        self.assertTrue(Appointment.objects.filter(pk=self.cancelled_appointment.pk).exists())
+        self.assertTrue(Appointment.objects.filter(pk=self.pending_appointment.pk).exists())
+        self.assertTrue(Appointment.objects.filter(pk=self.confirmed_appointment.pk).exists())
+        self.assertTrue(MedicalRecord.objects.filter(pk=self.record.pk).exists())
+        self.assertTrue(Prescription.objects.filter(pk=self.prescription.pk).exists())
+        self.assertTrue(Invoice.objects.filter(pk=self.invoice.pk).exists())
+        self.schedule.refresh_from_db()
+        self.assertTrue(self.schedule.is_active)
+
+    def test_inactive_doctor_is_not_available_for_new_appointment(self):
+        self.deactivate_doctor()
+
+        form = AppointmentForm()
+
+        self.assertNotIn(self.doctor, form.fields['doctor'].queryset)
+
+    def test_old_appointment_of_inactive_doctor_is_visible(self):
+        self.deactivate_doctor()
+
+        response = self.client.get(
+            reverse('appointments:detail', args=[self.done_appointment.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.doctor.full_name)
+        self.assertContains(response, self.patient.full_name)
+        self.assertContains(response, self.record.diagnosis)
+        self.assertContains(response, 'Xem hóa đơn')
+
+    def test_delete_doctor_with_appointments_is_protected(self):
+        with self.assertRaises(ProtectedError):
+            self.doctor.delete()

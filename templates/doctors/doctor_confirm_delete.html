@@ -1,27 +1,22 @@
 {% extends 'base.html' %}
-{% block title %}Xác Nhận Xóa Bác Sĩ{% endblock %}
-{% block page_title %}Xác Nhận Xóa{% endblock %}
+{% block title %}Ngừng Hoạt Động Bác Sĩ{% endblock %}
+{% block page_title %}Ngừng Hoạt Động{% endblock %}
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-5">
-        <div class="card shadow border-danger">
-            <div class="card-header bg-danger text-white"><h4 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>Xác Nhận Xóa</h4></div>
+        <div class="card shadow border-warning">
+            <div class="card-header bg-warning"><h4 class="mb-0"><i class="bi bi-pause-circle me-2"></i>Ngừng Hoạt Động</h4></div>
             <div class="card-body text-center py-4">
-                <h5>Xóa bác sĩ: <strong>{{ doctor.full_name }}</strong>?</h5>
+                <h5>Ngừng hoạt động bác sĩ <strong>{{ doctor.full_name }}</strong>?</h5>
                 <p class="text-muted">Chuyên khoa: {{ doctor.specialty }}</p>
-                {% if active_count > 0 %}
-                <div class="alert alert-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i><strong>Không thể xóa!</strong><br>Bác sĩ này còn <strong>{{ active_count }}</strong> lịch hẹn đang hoạt động.</div>
-                <a href="{% url 'doctors:detail' pk=doctor.pk %}" class="btn btn-secondary btn-lg"><i class="bi bi-arrow-left me-1"></i>Quay lại</a>
-                {% else %}
-                <div class="alert alert-warning"><strong>Hành động này không thể hoàn tác!</strong></div>
+                <div class="alert alert-info">Lịch sử khám của bác sĩ vẫn được giữ lại.</div>
                 <div class="d-flex gap-3 justify-content-center">
                     <a href="{% url 'doctors:detail' pk=doctor.pk %}" class="btn btn-secondary btn-lg">Hủy</a>
                     <form method="post" action="{% url 'doctors:delete' pk=doctor.pk %}">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-danger btn-lg"><i class="bi bi-trash me-1"></i>Xóa vĩnh viễn</button>
+                        <button type="submit" class="btn btn-warning btn-lg"><i class="bi bi-pause-circle me-1"></i>Ngừng hoạt động</button>
                     </form>
                 </div>
-                {% endif %}
             </div>
         </div>
     </div>

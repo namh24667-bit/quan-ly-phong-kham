@@ -60,25 +60,17 @@ def doctor_update(request, pk):
 
 
 @login_required
-@role_required('admin')
+@role_required('admin', 'staff')
 def doctor_delete(request, pk):
     doctor = get_object_or_404(Doctor, pk=pk)
-    active_count = doctor.appointment_set.filter(
-        status__in=['pending', 'confirmed', 'checked_in']
-    ).count()
 
     if request.method == 'POST':
-        if active_count > 0:
-            messages.error(request, f'Không thể xóa! BS. {doctor.full_name} còn {active_count} lịch hẹn đang hoạt động.')
-            return redirect('doctors:detail', pk=pk)
-        name = doctor.full_name
-        doctor.delete()
-        messages.success(request, f'Đã xóa bác sĩ {name}.')
+        doctor.is_active = False
+        doctor.save(update_fields=['is_active'])
+        messages.success(request, f'Đã ngừng hoạt động BS. {doctor.full_name}.')
         return redirect('doctors:list')
 
-    return render(request, 'doctors/doctor_confirm_delete.html', {
-        'doctor': doctor, 'active_count': active_count,
-    })
+    return render(request, 'doctors/doctor_confirm_delete.html', {'doctor': doctor})
 
 
 @login_required
