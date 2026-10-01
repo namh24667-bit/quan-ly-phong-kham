@@ -17,12 +17,14 @@
                     <tr><th class="text-muted">Địa chỉ:</th><td>{{ patient.address|default:"Chưa cập nhật" }}</td></tr>
                 </table>
             </div>
+            {% if is_admin_or_staff %}
             <div class="card-footer bg-transparent">
                 <div class="d-flex gap-2">
                     <a href="{% url 'patients:update' pk=patient.pk %}" class="btn btn-warning btn-sm"><i class="bi bi-pencil me-1"></i>Sửa</a>
-                    {% if patient.is_active %}<a href="{% url 'patients:delete' pk=patient.pk %}" class="btn btn-danger btn-sm"><i class="bi bi-archive me-1"></i>Ngừng hoạt động</a>{% endif %}
+                    {% if is_admin and patient.is_active %}<a href="{% url 'patients:delete' pk=patient.pk %}" class="btn btn-danger btn-sm"><i class="bi bi-archive me-1"></i>Ngừng hoạt động</a>{% endif %}
                 </div>
             </div>
+            {% endif %}
         </div>
     </div>
     <div class="col-md-8">

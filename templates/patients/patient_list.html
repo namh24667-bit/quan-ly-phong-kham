@@ -4,7 +4,7 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <small class="text-muted">{% if query %}{{ total }} kết quả cho "{{ query }}"{% else %}Tổng: {{ total }} bệnh nhân{% endif %}</small>
-    <a href="{% url 'patients:create' %}" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>Thêm Bệnh Nhân</a>
+    {% if is_admin_or_staff %}<a href="{% url 'patients:create' %}" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>Thêm Bệnh Nhân</a>{% endif %}
 </div>
 <div class="card mb-3 shadow-sm">
     <div class="card-body py-2">
@@ -34,8 +34,8 @@
                         <td><small>{{ p.created_at|date:"d/m/Y" }}</small></td>
                         <td class="text-center">
                             <a href="{% url 'patients:detail' pk=p.pk %}" class="btn btn-sm btn-outline-info"><i class="bi bi-eye"></i></a>
-                            <a href="{% url 'patients:update' pk=p.pk %}" class="btn btn-sm btn-outline-warning"><i class="bi bi-pencil"></i></a>
-                            <a href="{% url 'patients:delete' pk=p.pk %}" class="btn btn-sm btn-outline-danger" title="Ngừng hoạt động"><i class="bi bi-archive"></i></a>
+                            {% if is_admin_or_staff %}<a href="{% url 'patients:update' pk=p.pk %}" class="btn btn-sm btn-outline-warning"><i class="bi bi-pencil"></i></a>{% endif %}
+                            {% if is_admin %}<a href="{% url 'patients:delete' pk=p.pk %}" class="btn btn-sm btn-outline-danger" title="Ngừng hoạt động"><i class="bi bi-archive"></i></a>{% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -52,7 +52,7 @@
         </div>
         {% endif %}
         {% else %}
-        <div class="text-center py-5"><i class="bi bi-inbox display-1 text-muted"></i><p class="text-muted mt-3">{% if query %}Không tìm thấy "{{ query }}".{% else %}Chưa có bệnh nhân. <a href="{% url 'patients:create' %}">Thêm ngay</a>{% endif %}</p></div>
+        <div class="text-center py-5"><i class="bi bi-inbox display-1 text-muted"></i><p class="text-muted mt-3">{% if query %}Không tìm thấy "{{ query }}".{% else %}Chưa có bệnh nhân.{% if is_admin_or_staff %} <a href="{% url 'patients:create' %}">Thêm ngay</a>{% endif %}{% endif %}</p></div>
         {% endif %}
     </div>
 </div>

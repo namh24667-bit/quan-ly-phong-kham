@@ -2,7 +2,7 @@
 {% block title %}{{ doctor.full_name }}{% endblock %}
 {% block page_title %}Chi Tiết Bác Sĩ{% endblock %}
 {% block content %}
-<div class="mb-3"><a href="{% url 'doctors:list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Quay lại</a></div>
+<div class="mb-3"><a href="{% if is_admin_or_staff %}{% url 'doctors:list' %}{% else %}{% url 'dashboard:index' %}{% endif %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Quay lại</a></div>
 <div class="row g-4">
     <div class="col-md-4">
         <div class="card shadow">
@@ -18,12 +18,14 @@
                     <tr><th class="text-muted">Trạng thái:</th><td>{% if doctor.is_active %}<span class="badge bg-success">Đang làm việc</span>{% else %}<span class="badge bg-secondary">Tạm nghỉ</span>{% endif %}</td></tr>
                 </table>
             </div>
+            {% if is_admin_or_staff %}
             <div class="card-footer bg-transparent">
                 <div class="d-flex gap-2">
-                    <a href="{% url 'doctors:update' pk=doctor.pk %}" class="btn btn-warning btn-sm"><i class="bi bi-pencil me-1"></i>Sửa</a>
+                    {% if is_admin %}<a href="{% url 'doctors:update' pk=doctor.pk %}" class="btn btn-warning btn-sm"><i class="bi bi-pencil me-1"></i>Sửa</a>{% endif %}
                     {% if doctor.is_active %}<a href="{% url 'doctors:delete' pk=doctor.pk %}" class="btn btn-warning btn-sm"><i class="bi bi-pause-circle me-1"></i>Ngừng hoạt động</a>{% endif %}
                 </div>
             </div>
+            {% endif %}
         </div>
     </div>
     <div class="col-md-8">
