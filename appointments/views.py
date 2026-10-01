@@ -155,6 +155,8 @@ def appointment_done(request, pk):
     if appointment.status != 'checked_in':
         messages.error(request, f'Phải ở trạng thái "Đã check-in" mới hoàn thành được.')
         return redirect('appointments:detail', pk=pk)
+    if not hasattr(appointment, 'medical_record'):
+        raise PermissionDenied
     appointment.status = 'done'
     appointment.save()
     messages.success(request, 'Lịch hẹn đã hoàn thành!')

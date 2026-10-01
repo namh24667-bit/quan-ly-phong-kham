@@ -43,23 +43,31 @@
             <div class="card-header"><h6 class="mb-0"><i class="bi bi-gear me-1"></i>Hành động</h6></div>
             <div class="card-body d-grid gap-2">
                 {% if appointment.status == 'pending' %}
+                {% if is_admin_or_staff %}
                 <form method="post" action="{% url 'appointments:confirm' appointment.pk %}">{% csrf_token %}
                     <button type="submit" class="btn btn-primary w-100" onclick="return confirm('Xác nhận lịch hẹn này?')"><i class="bi bi-check-circle me-1"></i>Xác nhận lịch</button>
                 </form>
                 <form method="post" action="{% url 'appointments:cancel' appointment.pk %}">{% csrf_token %}
                     <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm('Hủy lịch hẹn?')"><i class="bi bi-x-circle me-1"></i>Hủy lịch</button>
                 </form>
+                {% endif %}
                 {% elif appointment.status == 'confirmed' %}
+                {% if is_admin_or_staff %}
                 <form method="post" action="{% url 'appointments:checkin' appointment.pk %}">{% csrf_token %}
                     <button type="submit" class="btn btn-info w-100 text-white" onclick="return confirm('Bệnh nhân đã đến?')"><i class="bi bi-box-arrow-in-right me-1"></i>Check-in</button>
                 </form>
                 <form method="post" action="{% url 'appointments:cancel' appointment.pk %}">{% csrf_token %}
                     <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm('Hủy lịch?')"><i class="bi bi-x-circle me-1"></i>Hủy lịch</button>
                 </form>
+                {% endif %}
                 {% elif appointment.status == 'checked_in' %}
+                {% if appointment.medical_record %}
+                {% if is_admin or is_doctor %}
                 <form method="post" action="{% url 'appointments:done' appointment.pk %}">{% csrf_token %}
                     <button type="submit" class="btn btn-success w-100" onclick="return confirm('Đánh dấu hoàn thành?')"><i class="bi bi-check2-all me-1"></i>Hoàn thành</button>
                 </form>
+                {% endif %}
+                {% endif %}
                 {% elif appointment.status == 'done' %}
                 <p class="text-center text-muted mb-0"><i class="bi bi-check-circle-fill text-success"></i> Đã hoàn thành.</p>
                 {% elif appointment.status == 'cancelled' %}

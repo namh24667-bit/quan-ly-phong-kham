@@ -401,6 +401,9 @@ class BackendPermissionTests(TestCase):
 
     def test_doctor_finishes_own_checked_in_appointment(self):
         appointment = self.make_appointment(self.patient, self.doctor, 'checked_in', 13)
+        MedicalRecord.objects.create(
+            appointment=appointment, symptoms='A', diagnosis='A', treatment='A',
+        )
         self.client.force_login(self.doctor_user)
 
         response = self.client.post(reverse('appointments:done', args=[appointment.pk]))
@@ -408,6 +411,29 @@ class BackendPermissionTests(TestCase):
         self.assertEqual(response.status_code, 302)
         appointment.refresh_from_db()
         self.assertEqual(appointment.status, 'done')
+
+    def test_doctor_cannot_finish_checked_in_without_medical_record(self):
+        appointment = self.make_appointment(self.patient, self.doctor, 'checked_in', 13)
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.post(reverse('appointments:done', args=[appointment.pk]))
+
+        self.assertEqual(response.status_code, 403)
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, 'checked_in')
+
+    def test_staff_cannot_finish_checked_in_appointment(self):
+        appointment = self.make_appointment(self.patient, self.doctor, 'checked_in', 13)
+        MedicalRecord.objects.create(
+            appointment=appointment, symptoms='A', diagnosis='A', treatment='A',
+        )
+        self.client.force_login(self.staff)
+
+        response = self.client.post(reverse('appointments:done', args=[appointment.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, 'checked_in')
 
     def test_doctor_cannot_finish_another_doctors_appointment(self):
         appointment = self.make_appointment(
@@ -421,15 +447,21 @@ class BackendPermissionTests(TestCase):
         appointment.refresh_from_db()
         self.assertEqual(appointment.status, 'checked_in')
 
-    def test_cancelled_appointment_cannot_change_status(self):
-        appointment = self.make_appointment(self.patient, self.doctor, 'cancelled', 15)
+    def test_done_and_cancelled_appointments_cannot_change_status(self):
         self.client.force_login(self.admin)
 
-        for name in ['confirm', 'checkin', 'done']:
-            response = self.client.post(reverse(f'appointments:{name}', args=[appointment.pk]))
-            self.assertEqual(response.status_code, 302)
-        appointment.refresh_from_db()
-        self.assertEqual(appointment.status, 'cancelled')
+        for status, hour in [('done', 15), ('cancelled', 16)]:
+            with self.subTest(status=status):
+                appointment = self.make_appointment(
+                    self.patient, self.doctor, status, hour,
+                )
+                for name in ['confirm', 'checkin', 'done']:
+                    response = self.client.post(
+                        reverse(f'appointments:{name}', args=[appointment.pk])
+                    )
+                    self.assertEqual(response.status_code, 302)
+                appointment.refresh_from_db()
+                self.assertEqual(appointment.status, status)
 
     def test_staff_can_cancel_pending_and_confirmed_appointments(self):
         self.client.force_login(self.staff)
@@ -481,6 +513,59 @@ class BackendPermissionTests(TestCase):
         self.assertEqual(success_response.status_code, 302)
         self.assertFalse(MedicalRecord.objects.filter(appointment=pending).exists())
         self.assertTrue(MedicalRecord.objects.filter(appointment=checked_in).exists())
+        checked_in.refresh_from_db()
+        self.assertEqual(checked_in.status, 'checked_in')
+
+    def test_appointment_actions_match_backend_roles(self):
+        create_url = reverse('appointments:create')
+        confirm_url = reverse('appointments:confirm', args=[self.appointment.pk])
+        cancel_url = reverse('appointments:cancel', args=[self.appointment.pk])
+        update_url = reverse('appointments:update', args=[self.appointment.pk])
+        superuser = User.objects.create_superuser(username='superuser')
+
+        self.client.force_login(self.doctor_user)
+        list_response = self.client.get(reverse('appointments:list'))
+        detail_response = self.client.get(
+            reverse('appointments:detail', args=[self.appointment.pk])
+        )
+        self.assertNotContains(list_response, create_url)
+        self.assertNotContains(detail_response, confirm_url)
+        self.assertNotContains(detail_response, cancel_url)
+        self.assertNotContains(detail_response, update_url)
+
+        for user in [self.staff, self.admin, superuser]:
+            with self.subTest(username=user.username):
+                self.client.force_login(user)
+                list_response = self.client.get(reverse('appointments:list'))
+                detail_response = self.client.get(
+                    reverse('appointments:detail', args=[self.appointment.pk])
+                )
+                self.assertContains(list_response, create_url)
+                self.assertContains(detail_response, confirm_url)
+                self.assertContains(detail_response, cancel_url)
+                self.assertContains(detail_response, update_url)
+
+    def test_done_action_requires_medical_record_and_backend_role(self):
+        appointment = self.make_appointment(self.patient, self.doctor, 'checked_in', 17)
+        detail_url = reverse('appointments:detail', args=[appointment.pk])
+        done_url = reverse('appointments:done', args=[appointment.pk])
+
+        self.client.force_login(self.doctor_user)
+        self.assertNotContains(self.client.get(detail_url), done_url)
+
+        MedicalRecord.objects.create(
+            appointment=appointment, symptoms='A', diagnosis='A', treatment='A',
+        )
+        self.assertContains(self.client.get(detail_url), done_url)
+
+        self.client.force_login(self.staff)
+        self.assertNotContains(self.client.get(detail_url), done_url)
+
+        superuser = User.objects.create_superuser(username='done_superuser')
+        for user in [self.admin, superuser]:
+            with self.subTest(username=user.username):
+                self.client.force_login(user)
+                self.assertContains(self.client.get(detail_url), done_url)
 
     def test_doctor_cannot_create_medical_record_for_another_doctor(self):
         appointment = self.make_appointment(
