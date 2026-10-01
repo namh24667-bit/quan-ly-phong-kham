@@ -239,6 +239,19 @@ class InvoiceLockTests(TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertContains(response, 'Đã thanh toán')
 
+    def test_authorized_users_see_invoice_print_action(self):
+        for user in [self.admin, self.staff, self.doctor_user]:
+            with self.subTest(role=user.profile.role):
+                self.client.force_login(user)
+
+                response = self.client.get(
+                    reverse('billing:detail', args=[self.pending_invoice.pk])
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, 'In hóa đơn')
+                self.assertContains(response, 'onclick="window.print()"')
+
 
 class BillingValueValidationTests(TestCase):
     def setUp(self):

@@ -85,4 +85,44 @@
         </div>
     </div>
 </div>
+
+{% if appointment.medical_record %}
+{% with prescriptions=appointment.medical_record.prescriptions.all %}
+{% if prescriptions %}
+<article class="card print-document print-prescription shadow-sm mt-4">
+    <div class="card-body p-4 p-md-5">
+        <header class="document-heading">
+            <div class="document-brand"><span class="document-brand-mark"><i class="bi bi-hospital"></i></span><div><strong>ClinicMS</strong><small>Hệ thống quản lý phòng khám</small></div></div>
+            <div class="text-md-end">
+                <p class="document-kicker">Hướng dẫn dùng thuốc</p>
+                <h2>ĐƠN THUỐC</h2>
+                <button type="button" class="btn btn-outline-primary btn-sm no-print mt-2" onclick="window.print()"><i class="bi bi-printer me-1"></i>In đơn thuốc</button>
+            </div>
+        </header>
+
+        <section class="document-meta">
+            <div><span>Bệnh nhân</span><strong>{{ appointment.patient.full_name }}</strong></div>
+            <div><span>Bác sĩ</span><strong>BS. {{ appointment.doctor.full_name }}</strong></div>
+            <div><span>Ngày khám</span><strong>{{ appointment.date|date:'d/m/Y' }}</strong></div>
+            <div><span>Chẩn đoán</span><strong>{{ appointment.medical_record.diagnosis }}</strong></div>
+        </section>
+
+        <section class="document-section mb-0">
+            <div class="section-heading"><h3>Danh sách thuốc</h3></div>
+            <div class="table-responsive">
+                <table class="table document-table mb-0">
+                    <thead><tr><th>Thuốc</th><th>Số lượng</th><th>Hướng dẫn sử dụng</th></tr></thead>
+                    <tbody>
+                        {% for item in prescriptions %}
+                        <tr><td class="fw-semibold">{{ item.medicine.name }}</td><td>{{ item.quantity }} {{ item.medicine.unit }}</td><td>{{ item.dosage }}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+</article>
+{% endif %}
+{% endwith %}
+{% endif %}
 {% endblock %}

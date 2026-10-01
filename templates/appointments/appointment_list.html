@@ -3,10 +3,10 @@
 {% block page_title %}Danh Sách Lịch Hẹn{% endblock %}
 {% block content %}
 <div class="page-actions mb-3">
-    <small class="text-muted">Tổng: {{ total }} lịch hẹn</small>
+    <div class="page-heading"><h2>Danh sách lịch hẹn</h2><p>Theo dõi và xử lý lịch khám · {{ total }} lịch hẹn phù hợp</p></div>
     {% if is_admin_or_staff %}<a href="{% url 'appointments:create' %}" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>Tạo lịch</a>{% endif %}
 </div>
-<div class="card mb-3 shadow-sm">
+<div class="card filter-card mb-3 shadow-sm">
     <div class="card-body">
         <form method="get" class="row g-2 align-items-end">
             <div class="col-12 col-md-5">

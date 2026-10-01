@@ -3,10 +3,10 @@
 {% block page_title %}Danh Sách Bác Sĩ{% endblock %}
 {% block content %}
 <div class="page-actions mb-3">
-    <small class="text-muted">{% if query %}{{ total }} kết quả cho "{{ query }}"{% else %}Tổng: {{ total }} bác sĩ{% endif %}</small>
+    <div class="page-heading"><h2>Danh sách bác sĩ</h2><p>{% if query %}{{ total }} kết quả cho “{{ query }}”{% else %}Theo dõi đội ngũ chuyên môn · {{ total }} bác sĩ{% endif %}</p></div>
     {% if is_admin %}<a href="{% url 'doctors:create' %}" class="btn btn-success"><i class="bi bi-plus-circle me-1"></i>Thêm Bác Sĩ</a>{% endif %}
 </div>
-<div class="card mb-3 shadow-sm">
+<div class="card filter-card mb-3 shadow-sm">
     <div class="card-body py-2">
         <form method="GET">
             <div class="input-group">

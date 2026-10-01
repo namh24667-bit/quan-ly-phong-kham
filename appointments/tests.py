@@ -719,6 +719,25 @@ class BackendPermissionTests(TestCase):
         self.assertContains(response, self.record.diagnosis)
         self.assertNotContains(response, 'Sửa hồ sơ và đơn thuốc')
 
+    def test_prescription_print_action_shows_existing_prescription(self):
+        medicine = Medicine.objects.create(
+            name='Printable Medicine', unit_price='15000', unit='Viên'
+        )
+        Prescription.objects.create(
+            medical_record=self.record, medicine=medicine,
+            quantity=2, dosage='Ngày 2 lần sau ăn',
+        )
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.get(
+            reverse('appointments:detail', args=[self.appointment.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'In đơn thuốc')
+        self.assertContains(response, medicine.name)
+        self.assertContains(response, 'Ngày 2 lần sau ăn')
+
 
 class AppointmentListFilterTests(TestCase):
     def setUp(self):
