@@ -13,6 +13,15 @@ def login_view(request):
         password = request.POST.get('password', '')
         user = authenticate(request, username=username, password=password)
         if user is not None:
+            if (not user.is_superuser
+                    and hasattr(user, 'profile')
+                    and user.profile.role == 'doctor'):
+                if not hasattr(user, 'doctor'):
+                    messages.error(request, 'Tài khoản bác sĩ chưa được liên kết.')
+                    return render(request, 'accounts/login.html')
+                if not user.doctor.is_active:
+                    messages.error(request, 'Tài khoản bác sĩ đã ngừng hoạt động.')
+                    return render(request, 'accounts/login.html')
             login(request, user)
             messages.success(request, f'Chào mừng {user.get_full_name() or user.username}!')
             next_url = request.GET.get('next') or 'dashboard:index'

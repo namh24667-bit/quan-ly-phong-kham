@@ -1,4 +1,5 @@
 from functools import wraps
+from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect
 from django.contrib import messages
 
@@ -17,7 +18,12 @@ def role_required(*roles):
             if request.user.is_superuser:
                 return view_func(request, *args, **kwargs)
             if hasattr(request.user, 'profile'):
-                if request.user.profile.role in roles:
+                role = request.user.profile.role
+                if role == 'doctor':
+                    if (not hasattr(request.user, 'doctor')
+                            or not request.user.doctor.is_active):
+                        raise PermissionDenied
+                if role in roles:
                     return view_func(request, *args, **kwargs)
             messages.error(request, f'Bạn không có quyền truy cập. (Cần: {", ".join(roles)})')
             return redirect('dashboard:index')
