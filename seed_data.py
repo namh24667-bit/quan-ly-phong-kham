@@ -155,7 +155,7 @@ record, _ = MedicalRecord.objects.update_or_create(
     },
 )
 
-medicine, _ = Medicine.objects.get_or_create(
+medicine, _ = Medicine.objects.update_or_create(
     name='Paracetamol 500mg',
     defaults={'unit_price': '2000', 'unit': 'Viên'},
 )
@@ -165,10 +165,10 @@ Prescription.objects.update_or_create(
     defaults={'quantity': 5, 'dosage': 'Ngày 1 viên sau ăn'},
 )
 
-general_service, _ = Service.objects.get_or_create(
+general_service, _ = Service.objects.update_or_create(
     name='Khám tổng quát', defaults={'price': '150000'},
 )
-Service.objects.get_or_create(
+Service.objects.update_or_create(
     name='Xét nghiệm cơ bản', defaults={'price': '100000'},
 )
 

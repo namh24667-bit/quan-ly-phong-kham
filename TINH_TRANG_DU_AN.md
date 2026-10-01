@@ -9,8 +9,8 @@ ClinicMS là project Django quản lý phòng khám dành cho bài tập môn h�
 - `accounts`: đăng nhập, đăng xuất, Profile và role.
 - `patients`: quản lý bệnh nhân và ngừng hoạt động bằng soft delete.
 - `doctors`: quản lý bác sĩ và lịch làm việc.
-- `appointments`: lịch khám, trạng thái lịch, hồ sơ khám và đơn thuốc.
-- `billing`: thuốc, dịch vụ và hóa đơn.
+- `appointments`: lịch khám, trạng thái lịch và hồ sơ khám.
+- `billing`: thuốc, đơn thuốc, dịch vụ và hóa đơn.
 - `dashboard`: số liệu và lịch khám tổng quan.
 
 ## Chức năng đã hoàn thành

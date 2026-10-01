@@ -4,7 +4,7 @@ ClinicMS là ứng dụng Django phục vụ bài tập quản lý phòng khám.
 
 ## Công nghệ
 
-- Python 3 tương thích với Django 6.1
+- Python 3.12 trở lên
 - Django 6.1
 - SQLite
 - HTML, Bootstrap 5 và Bootstrap Icons
@@ -47,6 +47,8 @@ Project sử dụng đúng ba biến trong `.env.example`:
 `python manage.py migrate` tạo hoặc cập nhật cấu trúc database SQLite.
 
 `python seed_data.py` tạo dữ liệu demo bằng ORM và có thể chạy lại mà không nhân bản hàng loạt dữ liệu mẫu. Các tài khoản dưới đây chỉ dùng cho local/demo:
+
+Lưu ý: `seed_data.py` chỉ dùng cho môi trường local/demo; khi chạy lại, script có thể đặt lại mật khẩu, đưa các tài khoản demo về trạng thái active và cập nhật lại dữ liệu demo cố định.
 
 | Vai trò | Tài khoản | Mật khẩu |
 |---|---|---|
