@@ -1,163 +1,61 @@
-# 📋 TÌNH TRẠNG DỰ ÁN — ClinicMS
+# Tình trạng dự án ClinicMS
 
-> **Cách dùng:** Khi chuyển sang tài khoản AI mới, paste toàn bộ file này vào đầu cuộc trò chuyện và nói: *"Đây là tình trạng dự án của tôi, hãy tiếp tục giúp tôi"*
+## Tổng quan
 
----
+ClinicMS là project Django quản lý phòng khám dành cho bài tập môn học. Source hiện tập trung vào nghiệp vụ cơ bản, phân quyền theo vai trò và kiểm tra workflow bằng automated test.
 
-## 1. THÔNG TIN DỰ ÁN
+## Các app hiện tại
 
-| | |
-|---|---|
-| **Tên** | ClinicMS — Hệ thống Quản lý Phòng khám |
-| **Framework** | Django 6.1, Python 3.12.8 |
-| **Database** | SQLite (file `db.sqlite3`) |
-| **UI** | Bootstrap 5 (CDN) + Bootstrap Icons |
-| **Thư mục** | `d:\phong_kham\` |
-| **Chạy server** | `cd d:\phong_kham && python manage.py runserver` |
-| **URL** | http://127.0.0.1:8000 |
+- `accounts`: đăng nhập, đăng xuất, Profile và role.
+- `patients`: quản lý bệnh nhân và ngừng hoạt động bằng soft delete.
+- `doctors`: quản lý bác sĩ và lịch làm việc.
+- `appointments`: lịch khám, trạng thái lịch, hồ sơ khám và đơn thuốc.
+- `billing`: thuốc, dịch vụ và hóa đơn.
+- `dashboard`: số liệu và lịch khám tổng quan.
 
----
+## Chức năng đã hoàn thành
 
-## 2. CẤU TRÚC PROJECT (đã build xong)
+- Phân quyền Admin, Staff và Doctor; superuser được phép truy cập như quản trị.
+- Quản lý bệnh nhân, bác sĩ và DoctorSchedule.
+- Kiểm tra lịch hẹn trong tương lai, giờ làm việc và trùng lịch bác sĩ.
+- Workflow xác nhận, check-in, hủy và hoàn thành Appointment.
+- MedicalRecord, Prescription, Medicine, Service và Invoice.
+- Khóa chỉnh sửa hồ sơ đã hoàn thành và hóa đơn đã thanh toán.
+- Dữ liệu demo có thể tạo bằng `python seed_data.py`.
 
-```
-d:\phong_kham\
-├── clinicms/           ← settings.py, urls.py
-├── accounts/           ← login/logout, UserProfile, role_required decorator
-├── patients/           ← CRUD bệnh nhân
-├── doctors/            ← CRUD bác sĩ
-├── appointments/       ← CRUD lịch hẹn + đổi trạng thái
-├── dashboard/          ← Thống kê tổng quan
-├── templates/          ← Tất cả HTML (base.html + từng app)
-├── static/css/         ← (rỗng, dùng Bootstrap CDN)
-├── guides/             ← Tài liệu học cho từng thành viên
-├── db.sqlite3          ← Database đã có dữ liệu mẫu
-├── manage.py
-└── seed_data.py        ← Script tạo dữ liệu mẫu
+## Workflow chính
+
+```text
+pending -> confirmed -> checked_in -> MedicalRecord -> done
+pending/confirmed -> cancelled
 ```
 
----
+Doctor chỉ hoàn thành Appointment của mình khi đã có MedicalRecord. Khi tạo MedicalRecord, hệ thống tạo Invoice Pending. Sau khi Appointment `done`, Admin/Staff có thể hoàn thiện dịch vụ và chuyển Invoice sang `Paid`; dữ liệu đã thanh toán bị khóa chỉnh sửa.
 
-## 3. CÁC MODEL
+## Phân quyền
 
-```python
-# accounts/models.py
-UserProfile: user(1-1 User), role(admin/doctor/staff), phone
+- **Admin:** thực hiện các thao tác quản lý và nghiệp vụ theo các view hiện tại.
+- **Staff:** phụ trách bệnh nhân, tiếp nhận lịch khám, lịch làm việc và billing; không xử lý MedicalRecord.
+- **Doctor:** chỉ truy cập Appointment, Patient, MedicalRecord và Invoice liên quan đến mình.
+- Doctor inactive bị chặn khỏi chức năng dành cho Doctor.
 
-# patients/models.py
-Patient: full_name, date_of_birth, gender(M/F/O), phone, address, created_at
+## Database
 
-# doctors/models.py
-Doctor: user(1-1 User nullable), full_name, specialty, phone, is_active
+Project đang dùng SQLite qua file local `db.sqlite3`. File database và `.env` được bỏ qua trong Git.
 
-# appointments/models.py
-Appointment: patient(FK), doctor(FK), date, start_time, end_time,
-             status(pending/confirmed/checked_in/done/cancelled), note, created_at
-MedicalRecord: appointment(1-1), symptoms, diagnosis, treatment, notes
-```
+## Test
 
----
-
-## 4. TÀI KHOẢN MẪU (đã tạo)
-
-| Username | Mật khẩu | Role |
-|---|---|---|
-| admin | admin123 | Quản trị viên |
-| nhanvien | nhanvien123 | Nhân viên |
-| bacsi_an | bacsi123 | Bác sĩ |
-| bacsi_binh | bacsi123 | Bác sĩ |
-
----
-
-## 5. LOGIC QUAN TRỌNG
-
-### Kiểm tra trùng lịch (`appointments/utils.py`)
-```python
-def check_appointment_conflict(doctor, date, start_time, end_time, exclude_id=None):
-    # Hai khoảng [A,B] và [C,D] trùng khi: A < D và B > C
-    # exclude_id: bỏ qua khi CHỈNH SỬA lịch (tránh conflict với chính nó)
-```
-
-### Phân quyền (`accounts/decorators.py`)
-```python
-@role_required('admin')           # Chỉ admin
-@role_required('admin', 'staff')  # Admin hoặc staff
-```
-
-### Luồng trạng thái lịch hẹn
-```
-pending → confirmed → checked_in → done
-pending/confirmed → cancelled (có thể hủy)
-```
-
----
-
-## 6. ĐÃ HOÀN THÀNH ✅
-
-- [x] Cài Django, khởi tạo project
-- [x] Tạo 5 apps: accounts, patients, doctors, appointments, dashboard
-- [x] Viết toàn bộ models + migrations
-- [x] Viết toàn bộ views (CRUD + logic nghiệp vụ)
-- [x] Viết toàn bộ URL routing
-- [x] Viết toàn bộ templates HTML (Bootstrap 5)
-- [x] Base template với sidebar có phân quyền
-- [x] Trang login riêng (không dùng base.html)
-- [x] Dashboard với 4 stat cards + bảng lịch hôm nay + lịch 7 ngày tới
-- [x] CRUD Bệnh nhân (tìm kiếm Q object + phân trang Paginator)
-- [x] CRUD Bác sĩ (không xóa được nếu còn lịch active)
-- [x] CRUD Lịch hẹn (kiểm tra trùng giờ)
-- [x] Đổi trạng thái lịch hẹn (confirm/checkin/done/cancel)
-- [x] Migrate database + seed dữ liệu mẫu
-- [x] Server chạy OK, `python manage.py check` = 0 lỗi
-- [x] Tạo 4 file guide học cho từng thành viên (trong `guides/`)
-
----
-
-## 7. CÒN LẠI / CÓ THỂ CẦN
-
-- [ ] Trang báo cáo / in lịch hẹn (nếu yêu cầu)
-- [ ] Admin site Django (chạy /admin/ cần tạo superuser)
-- [ ] Viết báo cáo đồ án (Word/PDF)
-- [ ] Tạo slide thuyết trình
-- [ ] Quay video demo
-
-### Tạo superuser (nếu cần vào /admin/):
-```powershell
-cd d:\phong_kham
-python manage.py createsuperuser
-```
-
----
-
-## 8. THÔNG TIN NHÓM
-
-- 4 thành viên, trình độ cơ bản, lần đầu dùng Django
-- Đây là **đồ án nhóm môn học** (BaiTapNhom-Tuan9BC.pdf, đề số 4)
-- Thời gian: 2 tuần
-- Yêu cầu: phân quyền 3 role, quản lý bệnh nhân, quản lý bác sĩ
-- Nộp: mã nguồn + báo cáo + slide + video demo
-- **Mỗi thành viên phải giải thích được code của mình** khi bảo vệ
-
----
-
-## 9. LỆNH HAY DÙNG
+Chạy kiểm tra bằng:
 
 ```powershell
-cd d:\phong_kham
-
-# Chạy server
-python manage.py runserver
-
-# Tạo migration khi đổi model
-python manage.py makemigrations
-python manage.py migrate
-
-# Tạo dữ liệu mẫu lại
-$env:PYTHONIOENCODING='utf-8'; python seed_data.py
-
-# Chạy tests
-python manage.py test appointments
-
-# Mở Django shell
-python manage.py shell
+python manage.py check
+python manage.py test
 ```
+
+Test hiện bao phủ permission, workflow Appointment, Patient soft delete, DoctorSchedule, Doctor inactive, validation thời gian/trùng lịch và khóa Invoice Paid.
+
+## Có thể nâng cấp
+
+- Làm dashboard theo từng role rõ hơn.
+- Cải thiện giao diện và trải nghiệm sử dụng.
+- Bổ sung chức năng in hóa đơn, đơn thuốc hoặc báo cáo nếu môn học yêu cầu.
