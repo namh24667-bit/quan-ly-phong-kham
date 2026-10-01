@@ -63,13 +63,15 @@ class InvoiceLockTests(TestCase):
         cls.service_a = Service.objects.create(name='Service A', price='100000')
         cls.service_b = Service.objects.create(name='Service B', price='200000')
         cls.pending_invoice = cls.make_invoice('Pending', 8)
-        cls.paid_invoice = cls.make_invoice('Paid', 9)
+        cls.paid_invoice = cls.make_invoice('Pending', 9)
         cls.admin_payment_invoice = cls.make_invoice('Pending', 10)
         cls.staff_payment_invoice = cls.make_invoice('Pending', 11)
         cls.pending_invoice.services.add(cls.service_a)
         cls.pending_invoice.recalculate()
         cls.paid_invoice.services.add(cls.service_a)
         cls.paid_invoice.recalculate()
+        cls.paid_invoice.status = 'Paid'
+        cls.paid_invoice.save(update_fields=['status'])
 
     @classmethod
     def make_user(cls, username, role):
@@ -79,10 +81,11 @@ class InvoiceLockTests(TestCase):
         return user
 
     @classmethod
-    def make_invoice(cls, status, hour):
+    def make_invoice(cls, status, hour, appointment_status='done'):
         appointment = Appointment.objects.create(
             patient=cls.patient, doctor=cls.doctor, date=timezone.localdate(),
-            start_time=time(hour), end_time=time(hour, 30), status='done',
+            start_time=time(hour), end_time=time(hour, 30),
+            status=appointment_status,
         )
         record = MedicalRecord.objects.create(
             appointment=appointment, symptoms='A', diagnosis='A', treatment='A'
@@ -143,6 +146,7 @@ class InvoiceLockTests(TestCase):
         ]
         for user, invoice in cases:
             with self.subTest(role=user.profile.role):
+                invoice.services.add(self.service_a)
                 self.client.force_login(user)
                 response = self.client.post(
                     reverse('billing:mark_paid', args=[invoice.pk])
@@ -151,6 +155,50 @@ class InvoiceLockTests(TestCase):
                 self.assertEqual(response.status_code, 302)
                 invoice.refresh_from_db()
                 self.assertEqual(invoice.status, 'Paid')
+                self.assertEqual(invoice.total_amount, Decimal('100000.00'))
+
+    def test_non_done_appointments_cannot_be_marked_paid(self):
+        self.client.force_login(self.staff)
+
+        for hour, status in enumerate(
+                ['pending', 'confirmed', 'checked_in', 'cancelled'], start=12):
+            with self.subTest(status=status):
+                invoice = self.make_invoice('Pending', hour, status)
+                response = self.client.post(
+                    reverse('billing:mark_paid', args=[invoice.pk])
+                )
+
+                self.assertEqual(response.status_code, 403)
+                invoice.refresh_from_db()
+                self.assertEqual(invoice.status, 'Pending')
+
+    def test_paid_invoice_recalculate_keeps_existing_totals(self):
+        old_medicine_total = self.paid_invoice.medicine_total
+        old_service_total = self.paid_invoice.service_total
+        old_total = self.paid_invoice.total_amount
+        self.paid_invoice.services.add(self.service_b)
+
+        result = self.paid_invoice.recalculate()
+
+        self.paid_invoice.refresh_from_db()
+        self.assertEqual(result, old_total)
+        self.assertEqual(self.paid_invoice.medicine_total, old_medicine_total)
+        self.assertEqual(self.paid_invoice.service_total, old_service_total)
+        self.assertEqual(self.paid_invoice.total_amount, old_total)
+
+    def test_mark_paid_button_only_shows_for_done_appointment(self):
+        checked_in_invoice = self.make_invoice('Pending', 16, 'checked_in')
+        self.client.force_login(self.staff)
+
+        checked_in_response = self.client.get(
+            reverse('billing:detail', args=[checked_in_invoice.pk])
+        )
+        done_response = self.client.get(
+            reverse('billing:detail', args=[self.pending_invoice.pk])
+        )
+
+        self.assertNotContains(checked_in_response, 'Đánh dấu đã thanh toán')
+        self.assertContains(done_response, 'Đánh dấu đã thanh toán')
 
     def test_paid_invoice_cannot_be_marked_paid_again(self):
         self.client.force_login(self.staff)

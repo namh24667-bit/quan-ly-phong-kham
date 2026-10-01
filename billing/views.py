@@ -67,9 +67,12 @@ def invoice_mark_paid(request, pk):
     if request.method != 'POST':
         return redirect('billing:detail', pk=pk)
     invoice = get_object_or_404(Invoice, pk=pk)
-    if invoice.status != 'Pending':
+    if (invoice.status != 'Pending'
+            or invoice.medical_record.appointment.status != 'done'):
         raise PermissionDenied
-    invoice.status = 'Paid'
-    invoice.save(update_fields=['status'])
+    with transaction.atomic():
+        invoice.recalculate()
+        invoice.status = 'Paid'
+        invoice.save(update_fields=['status'])
     messages.success(request, f'Hóa đơn #{invoice.pk} đã được đánh dấu đã thanh toán.')
     return redirect('billing:detail', pk=pk)

@@ -95,6 +95,8 @@ class Invoice(models.Model):
         return medicine_total, service_total, medicine_total + service_total
 
     def recalculate(self, save=True):
+        if self.status == 'Paid':
+            return self.total_amount
         self.medicine_total, self.service_total, self.total_amount = self.calculate_totals()
         if save:
             type(self).objects.filter(pk=self.pk).update(

@@ -261,6 +261,8 @@ def update_medical_record(request, pk):
             raise PermissionDenied
     if record.appointment.status != 'checked_in':
         raise PermissionDenied
+    if hasattr(record, 'invoice') and record.invoice.status == 'Paid':
+        raise PermissionDenied
     if request.method == 'POST':
         form = MedicalRecordForm(request.POST, instance=record, doctor=doctor)
         prescription_formset = PrescriptionFormSet(request.POST, instance=record)

@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from billing.models import Invoice
+from billing.models import Invoice, Medicine, Prescription
 from doctors.models import Doctor, DoctorSchedule
 from patients.models import Patient
 
@@ -579,6 +579,33 @@ class BackendPermissionTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.record.refresh_from_db()
         self.assertEqual(self.record.diagnosis, 'Diagnosis')
+
+    def test_paid_invoice_blocks_medical_record_and_prescription_update(self):
+        medicine = Medicine.objects.create(
+            name='Locked Medicine', unit_price='10000', unit='Viên'
+        )
+        prescription = Prescription.objects.create(
+            medical_record=self.record, medicine=medicine,
+            quantity=1, dosage='Ngày 1 lần',
+        )
+        self.appointment.status = 'checked_in'
+        self.appointment.save(update_fields=['status'])
+        self.invoice.recalculate()
+        self.invoice.status = 'Paid'
+        self.invoice.save(update_fields=['status'])
+        old_total = self.invoice.total_amount
+        self.client.force_login(self.doctor_user)
+        url = reverse('appointments:medical_record_update', args=[self.record.pk])
+
+        get_response = self.client.get(url)
+        post_response = self.client.post(url, self.medical_record_data(self.appointment))
+
+        self.assertEqual(get_response.status_code, 403)
+        self.assertEqual(post_response.status_code, 403)
+        prescription.refresh_from_db()
+        self.invoice.refresh_from_db()
+        self.assertEqual(prescription.quantity, 1)
+        self.assertEqual(self.invoice.total_amount, old_total)
 
     def test_doctor_cannot_update_done_medical_record(self):
         self.appointment.status = 'done'
