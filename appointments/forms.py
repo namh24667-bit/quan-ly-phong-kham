@@ -1,5 +1,6 @@
 from django import forms
 from django.db.models import Q
+from django.utils import timezone
 
 from doctors.models import Doctor, DoctorSchedule
 from patients.models import Patient
@@ -51,10 +52,17 @@ class AppointmentForm(forms.ModelForm):
                 f'Giờ kết thúc ({end.strftime("%H:%M")}) phải sau giờ bắt đầu ({start.strftime("%H:%M")}).'
             )
 
+        date = cleaned_data.get('date')
+        time_fields = {'date', 'start_time'}
+        check_time = not self.instance.pk or bool(time_fields.intersection(self.changed_data))
+        if check_time and date and start:
+            now = timezone.localtime()
+            if date < now.date() or (date == now.date() and start <= now.time()):
+                raise forms.ValidationError('Không thể đặt lịch khám trong quá khứ.')
+
         schedule_fields = {'doctor', 'date', 'start_time', 'end_time'}
         check_schedule = not self.instance.pk or bool(schedule_fields.intersection(self.changed_data))
         doctor = cleaned_data.get('doctor')
-        date = cleaned_data.get('date')
         if check_schedule and doctor and date and start and end:
             if not doctor.is_active:
                 raise forms.ValidationError('Bác sĩ đang ngừng hoạt động.')

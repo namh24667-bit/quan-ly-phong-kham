@@ -1,4 +1,6 @@
 from django import forms
+from django.db.models import Q
+
 from .models import Doctor, DoctorSchedule
 
 
@@ -38,3 +40,12 @@ class DoctorScheduleForm(forms.ModelForm):
             'end_time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        doctors = Doctor.objects.filter(is_active=True)
+        if self.instance.pk and self.instance.doctor_id:
+            doctors = Doctor.objects.filter(
+                Q(is_active=True) | Q(pk=self.instance.doctor_id)
+            )
+        self.fields['doctor'].queryset = doctors

@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.core.validators import MinValueValidator
 from django.db import models
 
 from appointments.models import MedicalRecord
@@ -7,7 +8,10 @@ from appointments.models import MedicalRecord
 
 class Medicine(models.Model):
     name = models.CharField(max_length=150, unique=True, verbose_name='Tên thuốc')
-    unit_price = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Đơn giá')
+    unit_price = models.DecimalField(
+        max_digits=12, decimal_places=2,
+        validators=[MinValueValidator(0)], verbose_name='Đơn giá',
+    )
     unit = models.CharField(max_length=30, verbose_name='Đơn vị')
 
     class Meta:
@@ -25,7 +29,9 @@ class Prescription(models.Model):
         verbose_name='Hồ sơ khám',
     )
     medicine = models.ForeignKey(Medicine, on_delete=models.PROTECT, verbose_name='Thuốc')
-    quantity = models.PositiveIntegerField(verbose_name='Số lượng')
+    quantity = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)], verbose_name='Số lượng'
+    )
     dosage = models.CharField(max_length=255, verbose_name='Liều dùng')
 
     class Meta:
@@ -42,7 +48,10 @@ class Prescription(models.Model):
 
 class Service(models.Model):
     name = models.CharField(max_length=150, unique=True, verbose_name='Tên dịch vụ')
-    price = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Giá tiền')
+    price = models.DecimalField(
+        max_digits=12, decimal_places=2,
+        validators=[MinValueValidator(0)], verbose_name='Giá tiền',
+    )
 
     class Meta:
         verbose_name = 'Dịch vụ'

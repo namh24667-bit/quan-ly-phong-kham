@@ -1,8 +1,9 @@
-from datetime import date, time
+from datetime import timedelta, time
 
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from billing.models import Invoice
 from doctors.models import Doctor, DoctorSchedule
@@ -25,7 +26,9 @@ class AppointmentScheduleTests(TestCase):
             doctor=self.doctor, weekday=0,
             start_time=time(8), end_time=time(12),
         )
-        self.monday = date(2026, 10, 5)
+        today = timezone.localdate()
+        days_until_monday = (7 - today.weekday()) % 7 or 7
+        self.monday = today + timedelta(days=days_until_monday)
         self.client.force_login(self.staff)
 
     def appointment_data(self, doctor=None, appointment_date=None,
@@ -46,6 +49,29 @@ class AppointmentScheduleTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(Appointment.objects.count(), 1)
+
+    def test_appointment_on_yesterday_is_rejected(self):
+        response = self.client.post(
+            reverse('appointments:create'),
+            self.appointment_data(
+                appointment_date=timezone.localdate() - timedelta(days=1)
+            ),
+        )
+
+        self.assertContains(response, 'Không thể đặt lịch khám trong quá khứ.')
+        self.assertFalse(Appointment.objects.exists())
+
+    def test_appointment_today_with_past_start_time_is_rejected(self):
+        response = self.client.post(
+            reverse('appointments:create'),
+            self.appointment_data(
+                appointment_date=timezone.localdate(),
+                start='00:00', end='00:30',
+            ),
+        )
+
+        self.assertContains(response, 'Không thể đặt lịch khám trong quá khứ.')
+        self.assertFalse(Appointment.objects.exists())
 
     def test_appointment_starting_before_schedule_is_rejected(self):
         response = self.client.post(
@@ -68,7 +94,7 @@ class AppointmentScheduleTests(TestCase):
     def test_appointment_on_day_without_schedule_is_rejected(self):
         response = self.client.post(
             reverse('appointments:create'),
-            self.appointment_data(appointment_date=date(2026, 10, 6)),
+            self.appointment_data(appointment_date=self.monday + timedelta(days=1)),
         )
 
         self.assertContains(response, 'Lịch hẹn nằm ngoài giờ làm việc của bác sĩ.')
@@ -122,6 +148,37 @@ class AppointmentScheduleTests(TestCase):
         self.assertContains(response, 'Lịch hẹn nằm ngoài giờ làm việc của bác sĩ.')
         appointment.refresh_from_db()
         self.assertEqual(appointment.start_time, time(9))
+
+    def test_editing_pending_appointment_to_past_is_rejected(self):
+        appointment = Appointment.objects.create(
+            patient=self.patient, doctor=self.doctor, date=self.monday,
+            start_time=time(9), end_time=time(10),
+        )
+
+        response = self.client.post(
+            reverse('appointments:update', args=[appointment.pk]),
+            self.appointment_data(
+                appointment_date=timezone.localdate() - timedelta(days=1)
+            ),
+        )
+
+        self.assertContains(response, 'Không thể đặt lịch khám trong quá khứ.')
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.date, self.monday)
+
+    def test_historical_appointment_still_has_detail_page(self):
+        appointment = Appointment.objects.create(
+            patient=self.patient, doctor=self.doctor,
+            date=timezone.localdate() - timedelta(days=1),
+            start_time=time(9), end_time=time(10), status='done',
+        )
+
+        response = self.client.get(
+            reverse('appointments:detail', args=[appointment.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.patient.full_name)
 
     def test_old_appointment_remains_visible_after_doctor_and_schedule_deactivate(self):
         appointment = Appointment.objects.create(
@@ -183,7 +240,7 @@ class BackendPermissionTests(TestCase):
         return Appointment.objects.create(
             patient=patient,
             doctor=doctor,
-            date=date.today(),
+            date=timezone.localdate(),
             start_time=time(hour, 0),
             end_time=time(hour, 30),
             status=status,

@@ -1,14 +1,17 @@
 from decimal import Decimal
-from datetime import date, time
+from datetime import time
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from appointments.models import Appointment, MedicalRecord
 from doctors.models import Doctor
 from patients.models import Patient
 
+from .forms import PrescriptionForm
 from .models import Invoice, Medicine, Prescription, Service
 
 
@@ -21,7 +24,7 @@ class InvoiceTotalTests(TestCase):
             full_name='Dr. Test', specialty='General', phone='0910000000',
         )
         appointment = Appointment.objects.create(
-            patient=patient, doctor=doctor, date='2026-09-22',
+            patient=patient, doctor=doctor, date=timezone.localdate(),
             start_time='09:00', end_time='09:30', status='done',
         )
         self.record = MedicalRecord.objects.create(
@@ -78,7 +81,7 @@ class InvoiceLockTests(TestCase):
     @classmethod
     def make_invoice(cls, status, hour):
         appointment = Appointment.objects.create(
-            patient=cls.patient, doctor=cls.doctor, date=date(2026, 10, 5),
+            patient=cls.patient, doctor=cls.doctor, date=timezone.localdate(),
             start_time=time(hour), end_time=time(hour, 30), status='done',
         )
         record = MedicalRecord.objects.create(
@@ -187,3 +190,75 @@ class InvoiceLockTests(TestCase):
 
                 self.assertEqual(response.status_code, 200)
                 self.assertContains(response, 'Đã thanh toán')
+
+
+class BillingValueValidationTests(TestCase):
+    def setUp(self):
+        patient = Patient.objects.create(
+            full_name='Patient Validation', date_of_birth='1990-01-01',
+            gender='M', phone='0900000002',
+        )
+        doctor = Doctor.objects.create(
+            full_name='Doctor Validation', specialty='General'
+        )
+        appointment = Appointment.objects.create(
+            patient=patient, doctor=doctor, date=timezone.localdate(),
+            start_time=time(9), end_time=time(10), status='checked_in',
+        )
+        self.record = MedicalRecord.objects.create(
+            appointment=appointment, symptoms='A', diagnosis='A', treatment='A'
+        )
+        self.medicine = Medicine.objects.create(
+            name='Valid Medicine', unit_price='10000', unit='Viên'
+        )
+
+    def test_negative_medicine_price_is_invalid(self):
+        medicine = Medicine(name='Negative Medicine', unit_price='-1', unit='Viên')
+
+        with self.assertRaises(ValidationError):
+            medicine.full_clean()
+
+    def test_zero_medicine_price_is_valid(self):
+        medicine = Medicine(name='Free Medicine', unit_price='0', unit='Viên')
+
+        medicine.full_clean()
+
+    def test_negative_service_price_is_invalid(self):
+        service = Service(name='Negative Service', price='-1')
+
+        with self.assertRaises(ValidationError):
+            service.full_clean()
+
+    def test_zero_service_price_is_valid(self):
+        service = Service(name='Free Service', price='0')
+
+        service.full_clean()
+
+    def test_zero_prescription_quantity_is_invalid(self):
+        form = PrescriptionForm(data={
+            'medicine': self.medicine.pk,
+            'quantity': 0,
+            'dosage': 'Ngày 1 lần',
+        })
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('quantity', form.errors)
+
+    def test_negative_prescription_quantity_is_invalid(self):
+        form = PrescriptionForm(data={
+            'medicine': self.medicine.pk,
+            'quantity': -1,
+            'dosage': 'Ngày 1 lần',
+        })
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('quantity', form.errors)
+
+    def test_positive_prescription_quantity_is_valid(self):
+        form = PrescriptionForm(data={
+            'medicine': self.medicine.pk,
+            'quantity': 1,
+            'dosage': 'Ngày 1 lần',
+        })
+
+        self.assertTrue(form.is_valid())

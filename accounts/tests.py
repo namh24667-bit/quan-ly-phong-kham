@@ -1,8 +1,9 @@
-from datetime import date, time
+from datetime import time
 
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from appointments.models import Appointment, MedicalRecord
 from billing.models import Invoice
@@ -66,7 +67,7 @@ class DoctorAccountAccessTests(TestCase):
     @classmethod
     def make_appointment(cls, doctor):
         return Appointment.objects.create(
-            patient=cls.patient, doctor=doctor, date=date(2026, 10, 5),
+            patient=cls.patient, doctor=doctor, date=timezone.localdate(),
             start_time=time(9), end_time=time(10), status='checked_in',
         )
 
@@ -85,14 +86,48 @@ class DoctorAccountAccessTests(TestCase):
             reverse('accounts:login'), self.login_data(self.active_user)
         )
 
-        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(
+            response, reverse('dashboard:index'), fetch_redirect_response=False
+        )
         self.assertEqual(
             int(self.client.session['_auth_user_id']), self.active_user.pk
         )
 
+    def test_login_with_internal_next_redirects_safely(self):
+        login_url = reverse('accounts:login') + '?next=/appointments/'
+        get_response = self.client.get(login_url)
+        self.assertContains(
+            get_response,
+            '<input type="hidden" name="next" value="/appointments/">',
+            html=True,
+        )
+
+        response = self.client.post(
+            reverse('accounts:login'),
+            {**self.login_data(self.active_user), 'next': '/appointments/'},
+        )
+
+        self.assertRedirects(
+            response, '/appointments/', fetch_redirect_response=False
+        )
+
+    def test_login_with_external_next_redirects_to_dashboard(self):
+        response = self.client.post(
+            reverse('accounts:login'),
+            {
+                **self.login_data(self.active_user),
+                'next': 'https://example.com',
+            },
+        )
+
+        self.assertRedirects(
+            response, reverse('dashboard:index'), fetch_redirect_response=False
+        )
+
     def test_inactive_doctor_cannot_log_in_or_create_authenticated_session(self):
         response = self.client.post(
-            reverse('accounts:login'), self.login_data(self.inactive_user)
+            reverse('accounts:login'),
+            {**self.login_data(self.inactive_user), 'next': '/appointments/'},
         )
 
         self.assertEqual(response.status_code, 200)
