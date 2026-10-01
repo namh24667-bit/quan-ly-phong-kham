@@ -374,6 +374,38 @@ class BackendPermissionTests(TestCase):
         appointment.refresh_from_db()
         self.assertEqual(appointment.status, 'cancelled')
 
+    def test_staff_can_cancel_pending_and_confirmed_appointments(self):
+        self.client.force_login(self.staff)
+
+        for status, hour in [('pending', 19), ('confirmed', 20)]:
+            with self.subTest(status=status):
+                appointment = self.make_appointment(
+                    self.patient, self.doctor, status, hour,
+                )
+                response = self.client.post(
+                    reverse('appointments:cancel', args=[appointment.pk])
+                )
+
+                self.assertEqual(response.status_code, 302)
+                appointment.refresh_from_db()
+                self.assertEqual(appointment.status, 'cancelled')
+
+    def test_staff_cannot_cancel_checked_in_done_or_cancelled_appointments(self):
+        self.client.force_login(self.staff)
+
+        for status, hour in [('checked_in', 21), ('done', 22), ('cancelled', 23)]:
+            with self.subTest(status=status):
+                appointment = self.make_appointment(
+                    self.patient, self.doctor, status, hour,
+                )
+                response = self.client.post(
+                    reverse('appointments:cancel', args=[appointment.pk])
+                )
+
+                self.assertEqual(response.status_code, 302)
+                appointment.refresh_from_db()
+                self.assertEqual(appointment.status, status)
+
     def test_only_checked_in_appointment_can_create_medical_record(self):
         pending = self.make_appointment(self.patient, self.doctor, 'pending', 16)
         checked_in = self.make_appointment(self.patient, self.doctor, 'checked_in', 17)

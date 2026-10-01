@@ -46,6 +46,8 @@ def invoice_detail(request, pk):
 @role_required('admin', 'staff')
 def invoice_update(request, pk):
     invoice = get_object_or_404(Invoice, pk=pk)
+    if invoice.status == 'Paid':
+        raise PermissionDenied
     if request.method == 'POST':
         form = InvoiceForm(request.POST, instance=invoice)
         if form.is_valid():
@@ -65,6 +67,8 @@ def invoice_mark_paid(request, pk):
     if request.method != 'POST':
         return redirect('billing:detail', pk=pk)
     invoice = get_object_or_404(Invoice, pk=pk)
+    if invoice.status != 'Pending':
+        raise PermissionDenied
     invoice.status = 'Paid'
     invoice.save(update_fields=['status'])
     messages.success(request, f'Hóa đơn #{invoice.pk} đã được đánh dấu đã thanh toán.')

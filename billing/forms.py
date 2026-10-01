@@ -27,9 +27,8 @@ PrescriptionFormSet = inlineformset_factory(
 class InvoiceForm(forms.ModelForm):
     class Meta:
         model = Invoice
-        fields = ['services', 'status']
+        fields = ['services']
         widgets = {
             'services': forms.SelectMultiple(attrs={'class': 'form-select', 'size': 6}),
-            'status': forms.Select(attrs={'class': 'form-select'}),
         }
-        labels = {'services': 'Dịch vụ', 'status': 'Trạng thái thanh toán'}
+        labels = {'services': 'Dịch vụ'}

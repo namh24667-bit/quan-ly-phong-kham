@@ -168,7 +168,7 @@ def appointment_cancel(request, pk):
     if request.method != 'POST':
         return redirect('appointments:list')
     appointment = get_object_or_404(Appointment, pk=pk)
-    if appointment.status in ['done', 'cancelled']:
+    if appointment.status not in ['pending', 'confirmed']:
         messages.error(request, f'Không thể hủy lịch đang ở "{appointment.get_status_display()}".')
         return redirect('appointments:detail', pk=pk)
     old = appointment.get_status_display()
