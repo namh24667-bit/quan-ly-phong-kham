@@ -5,10 +5,140 @@ from django.test import TestCase
 from django.urls import reverse
 
 from billing.models import Invoice
-from doctors.models import Doctor
+from doctors.models import Doctor, DoctorSchedule
 from patients.models import Patient
 
 from .models import Appointment, MedicalRecord
+
+
+class AppointmentScheduleTests(TestCase):
+    def setUp(self):
+        self.staff = User.objects.create_user(username='schedule_staff')
+        self.staff.profile.role = 'staff'
+        self.staff.profile.save()
+        self.doctor = Doctor.objects.create(full_name='Doctor A', specialty='General')
+        self.patient = Patient.objects.create(
+            full_name='Patient A', date_of_birth='1990-01-01',
+            gender='M', phone='0900000001',
+        )
+        self.schedule = DoctorSchedule.objects.create(
+            doctor=self.doctor, weekday=0,
+            start_time=time(8), end_time=time(12),
+        )
+        self.monday = date(2026, 10, 5)
+        self.client.force_login(self.staff)
+
+    def appointment_data(self, doctor=None, appointment_date=None,
+                         start='09:00', end='10:00'):
+        return {
+            'patient': self.patient.pk,
+            'doctor': (doctor or self.doctor).pk,
+            'date': appointment_date or self.monday,
+            'start_time': start,
+            'end_time': end,
+            'note': '',
+        }
+
+    def test_appointment_inside_schedule_is_created(self):
+        response = self.client.post(
+            reverse('appointments:create'), self.appointment_data()
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Appointment.objects.count(), 1)
+
+    def test_appointment_starting_before_schedule_is_rejected(self):
+        response = self.client.post(
+            reverse('appointments:create'),
+            self.appointment_data(start='07:30', end='09:00'),
+        )
+
+        self.assertContains(response, 'Lịch hẹn nằm ngoài giờ làm việc của bác sĩ.')
+        self.assertFalse(Appointment.objects.exists())
+
+    def test_appointment_ending_after_schedule_is_rejected(self):
+        response = self.client.post(
+            reverse('appointments:create'),
+            self.appointment_data(start='11:30', end='12:30'),
+        )
+
+        self.assertContains(response, 'Lịch hẹn nằm ngoài giờ làm việc của bác sĩ.')
+        self.assertFalse(Appointment.objects.exists())
+
+    def test_appointment_on_day_without_schedule_is_rejected(self):
+        response = self.client.post(
+            reverse('appointments:create'),
+            self.appointment_data(appointment_date=date(2026, 10, 6)),
+        )
+
+        self.assertContains(response, 'Lịch hẹn nằm ngoài giờ làm việc của bác sĩ.')
+        self.assertFalse(Appointment.objects.exists())
+
+    def test_doctor_without_active_schedule_is_rejected(self):
+        doctor = Doctor.objects.create(full_name='Doctor B', specialty='General')
+
+        response = self.client.post(
+            reverse('appointments:create'), self.appointment_data(doctor=doctor)
+        )
+
+        self.assertContains(response, 'Bác sĩ chưa có lịch làm việc.')
+        self.assertFalse(Appointment.objects.exists())
+
+    def test_inactive_schedule_is_not_used(self):
+        self.schedule.is_active = False
+        self.schedule.save(update_fields=['is_active'])
+
+        response = self.client.post(
+            reverse('appointments:create'), self.appointment_data()
+        )
+
+        self.assertContains(response, 'Bác sĩ chưa có lịch làm việc.')
+        self.assertFalse(Appointment.objects.exists())
+
+    def test_inactive_doctor_cannot_be_selected(self):
+        doctor = Doctor.objects.create(
+            full_name='Inactive Doctor', specialty='General', is_active=False
+        )
+
+        response = self.client.post(
+            reverse('appointments:create'), self.appointment_data(doctor=doctor)
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('doctor', response.context['form'].errors)
+        self.assertFalse(Appointment.objects.exists())
+
+    def test_editing_appointment_outside_schedule_is_rejected(self):
+        appointment = Appointment.objects.create(
+            patient=self.patient, doctor=self.doctor, date=self.monday,
+            start_time=time(9), end_time=time(10),
+        )
+
+        response = self.client.post(
+            reverse('appointments:update', args=[appointment.pk]),
+            self.appointment_data(start='13:00', end='14:00'),
+        )
+
+        self.assertContains(response, 'Lịch hẹn nằm ngoài giờ làm việc của bác sĩ.')
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.start_time, time(9))
+
+    def test_old_appointment_remains_visible_after_doctor_and_schedule_deactivate(self):
+        appointment = Appointment.objects.create(
+            patient=self.patient, doctor=self.doctor, date=self.monday,
+            start_time=time(9), end_time=time(10),
+        )
+        self.schedule.is_active = False
+        self.schedule.save(update_fields=['is_active'])
+        self.doctor.is_active = False
+        self.doctor.save(update_fields=['is_active'])
+
+        response = self.client.get(
+            reverse('appointments:detail', args=[appointment.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.patient.full_name)
 
 
 class BackendPermissionTests(TestCase):

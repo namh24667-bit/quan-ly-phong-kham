@@ -63,6 +63,9 @@
         <a href="{% url 'doctors:list' %}" class="nav-link {% if request.resolver_match.app_name == 'doctors' %}active{% endif %}">
             <i class="bi bi-person-badge-fill me-2"></i>Bác sĩ
         </a>
+        <a href="{% url 'doctors:schedule_list' %}" class="nav-link {% if request.resolver_match.url_name == 'schedule_list' %}active{% endif %}">
+            <i class="bi bi-calendar-week me-2"></i>Lịch làm việc
+        </a>
         <a href="{% url 'appointments:list' %}" class="nav-link {% if request.resolver_match.app_name == 'appointments' %}active{% endif %}">
             <i class="bi bi-calendar3 me-2"></i>Lịch hẹn
         </a>
@@ -86,6 +89,9 @@
         <div class="nav-section mt-2">Lịch khám</div>
         <a href="{% url 'appointments:my_schedule' %}" class="nav-link {% if request.resolver_match.url_name == 'my_schedule' %}active{% endif %}">
             <i class="bi bi-calendar-week-fill me-2"></i>Lịch của tôi
+        </a>
+        <a href="{% url 'doctors:schedule_list' %}" class="nav-link {% if request.resolver_match.url_name == 'schedule_list' %}active{% endif %}">
+            <i class="bi bi-clock me-2"></i>Giờ làm việc
         </a>
         <a href="{% url 'appointments:list' %}" class="nav-link {% if request.resolver_match.app_name == 'appointments' and request.resolver_match.url_name != 'my_schedule' %}active{% endif %}">
             <i class="bi bi-calendar3 me-2"></i>Tất cả lịch hẹn

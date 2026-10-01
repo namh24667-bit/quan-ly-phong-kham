@@ -1,6 +1,7 @@
 from django import forms
 from django.db.models import Q
 
+from doctors.models import Doctor, DoctorSchedule
 from patients.models import Patient
 
 from .models import Appointment, MedicalRecord
@@ -34,6 +35,13 @@ class AppointmentForm(forms.ModelForm):
             )
         self.fields['patient'].queryset = patients
 
+        doctors = Doctor.objects.filter(is_active=True)
+        if self.instance.pk and self.instance.doctor_id:
+            doctors = Doctor.objects.filter(
+                Q(is_active=True) | Q(pk=self.instance.doctor_id)
+            )
+        self.fields['doctor'].queryset = doctors
+
     def clean(self):
         cleaned_data = super().clean()
         start = cleaned_data.get('start_time')
@@ -42,6 +50,26 @@ class AppointmentForm(forms.ModelForm):
             raise forms.ValidationError(
                 f'Giờ kết thúc ({end.strftime("%H:%M")}) phải sau giờ bắt đầu ({start.strftime("%H:%M")}).'
             )
+
+        schedule_fields = {'doctor', 'date', 'start_time', 'end_time'}
+        check_schedule = not self.instance.pk or bool(schedule_fields.intersection(self.changed_data))
+        doctor = cleaned_data.get('doctor')
+        date = cleaned_data.get('date')
+        if check_schedule and doctor and date and start and end:
+            if not doctor.is_active:
+                raise forms.ValidationError('Bác sĩ đang ngừng hoạt động.')
+
+            schedules = DoctorSchedule.objects.filter(doctor=doctor, is_active=True)
+            if not schedules.exists():
+                raise forms.ValidationError('Bác sĩ chưa có lịch làm việc.')
+
+            is_in_schedule = schedules.filter(
+                weekday=date.weekday(),
+                start_time__lte=start,
+                end_time__gte=end,
+            ).exists()
+            if not is_in_schedule:
+                raise forms.ValidationError('Lịch hẹn nằm ngoài giờ làm việc của bác sĩ.')
         return cleaned_data
 
 

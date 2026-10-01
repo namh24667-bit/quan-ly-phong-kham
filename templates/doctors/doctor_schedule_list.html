@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block title %}Lịch Làm Việc{% endblock %}
+{% block page_title %}Lịch Làm Việc Bác Sĩ{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-end mb-3">
+    {% if is_admin_or_staff %}
+    <a href="{% url 'doctors:schedule_create' %}" class="btn btn-success">
+        <i class="bi bi-plus-circle me-1"></i>Thêm lịch làm việc
+    </a>
+    {% endif %}
+</div>
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover table-striped mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th>Bác sĩ</th>
+                    <th>Thứ</th>
+                    <th>Bắt đầu</th>
+                    <th>Kết thúc</th>
+                    <th>Trạng thái</th>
+                    {% if is_admin_or_staff %}<th class="text-center">Thao tác</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for schedule in schedules %}
+                <tr>
+                    <td>BS. {{ schedule.doctor.full_name }}</td>
+                    <td>{{ schedule.get_weekday_display }}</td>
+                    <td>{{ schedule.start_time|time:"H:i" }}</td>
+                    <td>{{ schedule.end_time|time:"H:i" }}</td>
+                    <td>
+                        {% if schedule.is_active %}
+                        <span class="badge bg-success">Đang hoạt động</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Đã ngừng</span>
+                        {% endif %}
+                    </td>
+                    {% if is_admin_or_staff %}
+                    <td class="text-center">
+                        <a href="{% url 'doctors:schedule_update' schedule.pk %}" class="btn btn-sm btn-outline-warning">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        {% if schedule.is_active %}
+                        <form method="post" action="{% url 'doctors:schedule_deactivate' schedule.pk %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Ngừng</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center py-4 text-muted">Chưa có lịch làm việc.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

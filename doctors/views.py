@@ -4,8 +4,8 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q, Count
 from accounts.decorators import role_required
-from .models import Doctor
-from .forms import DoctorForm
+from .models import Doctor, DoctorSchedule
+from .forms import DoctorForm, DoctorScheduleForm
 
 
 @login_required
@@ -96,3 +96,61 @@ def doctor_detail(request, pk):
     return render(request, 'doctors/doctor_detail.html', {
         'doctor': doctor, 'appointments': appointments,
     })
+
+
+@login_required
+@role_required('admin', 'staff', 'doctor')
+def schedule_list(request):
+    schedules = DoctorSchedule.objects.select_related('doctor')
+    if not request.user.is_superuser and request.user.profile.role == 'doctor':
+        if not hasattr(request.user, 'doctor'):
+            raise PermissionDenied
+        schedules = schedules.filter(doctor=request.user.doctor)
+    return render(request, 'doctors/doctor_schedule_list.html', {
+        'schedules': schedules,
+    })
+
+
+@login_required
+@role_required('admin', 'staff')
+def schedule_create(request):
+    if request.method == 'POST':
+        form = DoctorScheduleForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Đã thêm lịch làm việc.')
+            return redirect('doctors:schedule_list')
+    else:
+        form = DoctorScheduleForm()
+    return render(request, 'doctors/doctor_schedule_form.html', {
+        'form': form, 'title': 'Thêm Lịch Làm Việc', 'button_text': 'Thêm lịch',
+    })
+
+
+@login_required
+@role_required('admin', 'staff')
+def schedule_update(request, pk):
+    schedule = get_object_or_404(DoctorSchedule, pk=pk)
+    if request.method == 'POST':
+        form = DoctorScheduleForm(request.POST, instance=schedule)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Đã cập nhật lịch làm việc.')
+            return redirect('doctors:schedule_list')
+    else:
+        form = DoctorScheduleForm(instance=schedule)
+    return render(request, 'doctors/doctor_schedule_form.html', {
+        'form': form, 'schedule': schedule,
+        'title': 'Sửa Lịch Làm Việc', 'button_text': 'Lưu thay đổi',
+    })
+
+
+@login_required
+@role_required('admin', 'staff')
+def schedule_deactivate(request, pk):
+    if request.method == 'POST':
+        schedule = get_object_or_404(DoctorSchedule, pk=pk)
+        schedule.is_active = False
+        schedule.save(update_fields=['is_active'])
+        messages.success(request, 'Đã ngừng lịch làm việc.')
+    return redirect('doctors:schedule_list')
