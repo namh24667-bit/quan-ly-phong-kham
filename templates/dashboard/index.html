@@ -3,7 +3,7 @@
 {% block page_title %}{% if dashboard_role == 'doctor' %}Dashboard Bác Sĩ{% elif dashboard_role == 'staff' %}Dashboard Vận Hành{% else %}Dashboard Tổng Quan{% endif %}{% endblock %}
 
 {% block content %}
-<div class="row g-3 mb-4">
+<div class="row g-3 mb-4 dashboard-stats">
     {% if dashboard_role == 'admin' %}
     <div class="col-md-6 col-xl-3">
         <div class="card text-white border-0 shadow-sm" style="background:linear-gradient(135deg,#0d6efd,#0a58ca)">
@@ -115,12 +115,13 @@
 <div class="row g-4">
     <div class="col-lg-7">
         <div class="card shadow-sm">
-            <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card-header card-header-responsive">
                 <h5 class="mb-0"><i class="bi bi-calendar-day me-2 text-primary"></i>{% if dashboard_role == 'doctor' %}Lịch Của Tôi Hôm Nay{% else %}Lịch Hẹn Hôm Nay{% endif %} <small class="text-muted fs-6">({{ today|date:"d/m/Y" }})</small></h5>
                 {% if is_admin_or_staff %}<a href="{% url 'appointments:create' %}" class="btn btn-sm btn-primary"><i class="bi bi-plus"></i> Tạo</a>{% endif %}
             </div>
             <div class="card-body p-0">
                 {% if appointments_today %}
+                <div class="table-responsive">
                 <table class="table table-hover mb-0">
                     <thead class="table-light"><tr><th>Giờ</th><th>Bệnh nhân</th><th>Bác sĩ</th><th>Trạng thái</th><th></th></tr></thead>
                     <tbody>
@@ -130,11 +131,12 @@
                             <td>{{ appt.patient.full_name }}</td>
                             <td>BS. {{ appt.doctor.full_name }}</td>
                             <td><span class="badge bg-{{ appt.get_status_badge_class }}">{{ appt.get_status_display }}</span></td>
-                            <td><a href="{% url 'appointments:detail' appt.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a></td>
+                            <td><a href="{% url 'appointments:detail' appt.pk %}" class="btn btn-sm btn-outline-primary" title="Xem chi tiết" aria-label="Xem chi tiết lịch hẹn"><i class="bi bi-eye"></i></a></td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
+                </div>
                 {% else %}
                 <div class="text-center py-4 text-muted"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>Không có lịch hẹn hôm nay.</div>
                 {% endif %}
@@ -150,7 +152,7 @@
                 <ul class="list-group list-group-flush">
                     {% for appt in upcoming %}
                     <li class="list-group-item">
-                        <div class="d-flex justify-content-between align-items-start">
+                        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
                             <div><strong>{{ appt.patient.full_name }}</strong><br><small class="text-muted"><i class="bi bi-calendar3 me-1"></i>{{ appt.date|date:"d/m" }} <i class="bi bi-clock ms-1 me-1"></i>{{ appt.start_time|time:"H:i" }} — BS. {{ appt.doctor.full_name }}</small></div>
                             <span class="badge bg-{{ appt.get_status_badge_class }}">{{ appt.get_status_display }}</span>
                         </div>

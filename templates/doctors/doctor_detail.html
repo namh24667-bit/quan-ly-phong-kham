@@ -20,7 +20,7 @@
             </div>
             {% if is_admin_or_staff %}
             <div class="card-footer bg-transparent">
-                <div class="d-flex gap-2">
+                <div class="detail-actions">
                     {% if is_admin %}<a href="{% url 'doctors:update' pk=doctor.pk %}" class="btn btn-warning btn-sm"><i class="bi bi-pencil me-1"></i>Sửa</a>{% endif %}
                     {% if doctor.is_active %}<a href="{% url 'doctors:delete' pk=doctor.pk %}" class="btn btn-warning btn-sm"><i class="bi bi-pause-circle me-1"></i>Ngừng hoạt động</a>{% endif %}
                 </div>
@@ -33,6 +33,7 @@
             <div class="card-header bg-primary text-white"><h5 class="mb-0"><i class="bi bi-calendar3 me-2"></i>Lịch Hẹn Gần Đây</h5></div>
             <div class="card-body p-0">
                 {% if appointments %}
+                <div class="table-responsive">
                 <table class="table table-hover mb-0">
                     <thead class="table-light"><tr><th>Ngày</th><th>Giờ</th><th>Bệnh nhân</th><th>Trạng thái</th></tr></thead>
                     <tbody>
@@ -46,6 +47,7 @@
                         {% endfor %}
                     </tbody>
                 </table>
+                </div>
                 {% else %}
                 <div class="text-center py-4 text-muted"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>Chưa có lịch hẹn nào.</div>
                 {% endif %}

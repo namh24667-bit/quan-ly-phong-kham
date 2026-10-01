@@ -38,7 +38,7 @@
                         {% if prescription_form.errors %}<div class="text-danger small">{{ prescription_form.errors }}</div>{% endif %}
                     </div>
                     {% endfor %}
-                    <div class="d-flex justify-content-end gap-2 mt-4">
+                    <div class="form-actions justify-content-end mt-4">
                         <a href="{% url 'appointments:my_schedule' %}" class="btn btn-outline-secondary">Hủy</a>
                         <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Lưu hồ sơ</button>
                     </div>

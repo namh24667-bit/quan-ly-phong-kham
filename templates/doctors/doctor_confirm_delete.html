@@ -10,7 +10,7 @@
                 <h5>Ngừng hoạt động bác sĩ <strong>{{ doctor.full_name }}</strong>?</h5>
                 <p class="text-muted">Chuyên khoa: {{ doctor.specialty }}</p>
                 <div class="alert alert-info">Lịch sử khám của bác sĩ vẫn được giữ lại.</div>
-                <div class="d-flex gap-3 justify-content-center">
+                <div class="detail-actions justify-content-center">
                     <a href="{% url 'doctors:detail' pk=doctor.pk %}" class="btn btn-secondary btn-lg">Hủy</a>
                     <form method="post" action="{% url 'doctors:delete' pk=doctor.pk %}">
                         {% csrf_token %}
