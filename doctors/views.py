@@ -2,6 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.core.paginator import Paginator
 from django.db.models import Q, Count
 from accounts.decorators import role_required
 from .models import Doctor, DoctorSchedule
@@ -17,9 +18,17 @@ def doctor_list(request):
         doctors = doctors.filter(
             Q(full_name__icontains=query) | Q(specialty__icontains=query)
         )
-    doctors = doctors.annotate(appointment_count=Count('appointment')).order_by('full_name')
+    doctors = doctors.annotate(appointment_count=Count('appointment')).order_by('full_name', 'pk')
+    paginator = Paginator(doctors, 10)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+    query_params = request.GET.copy()
+    query_params.pop('page', None)
     return render(request, 'doctors/doctor_list.html', {
-        'doctors': doctors, 'query': query, 'total': doctors.count(),
+        'doctors': page_obj,
+        'page_obj': page_obj,
+        'query': query,
+        'query_string': query_params.urlencode(),
+        'total': paginator.count,
     })
 
 

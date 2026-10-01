@@ -718,3 +718,145 @@ class BackendPermissionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.record.diagnosis)
         self.assertNotContains(response, 'Sửa hồ sơ và đơn thuốc')
+
+
+class AppointmentListFilterTests(TestCase):
+    def setUp(self):
+        self.admin = self.make_user('filter_admin', 'admin')
+        self.staff = self.make_user('filter_staff', 'staff')
+        self.doctor_user = self.make_user('filter_doctor_a', 'doctor')
+        self.other_doctor_user = self.make_user('filter_doctor_b', 'doctor')
+        self.doctor = Doctor.objects.create(
+            user=self.doctor_user, full_name='Bac Si An', specialty='General'
+        )
+        self.other_doctor = Doctor.objects.create(
+            user=self.other_doctor_user, full_name='Bac Si Binh', specialty='General'
+        )
+        self.patient = Patient.objects.create(
+            full_name='Nguyen Van An', date_of_birth='1990-01-01',
+            gender='M', phone='0900000101',
+        )
+        self.other_patient = Patient.objects.create(
+            full_name='Tran Van Binh', date_of_birth='1991-01-01',
+            gender='M', phone='0900000102',
+        )
+        self.today = timezone.localdate()
+        self.tomorrow = self.today + timedelta(days=1)
+        self.own_appointment = self.make_appointment(
+            self.patient, self.doctor, 'pending', self.today, 8
+        )
+        self.other_appointment = self.make_appointment(
+            self.other_patient, self.other_doctor, 'confirmed', self.tomorrow, 9
+        )
+
+    def make_user(self, username, role):
+        user = User.objects.create_user(username=username)
+        user.profile.role = role
+        user.profile.save()
+        return user
+
+    def make_appointment(self, patient, doctor, status, date, hour):
+        return Appointment.objects.create(
+            patient=patient, doctor=doctor, status=status, date=date,
+            start_time=time(hour), end_time=time(hour, 30),
+        )
+
+    def page_appointments(self, response):
+        return list(response.context['page_obj'].object_list)
+
+    def test_appointment_list_is_paginated_by_ten(self):
+        for index in range(10):
+            self.make_appointment(
+                self.patient, self.doctor, 'pending', self.today, 10 + index
+            )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('appointments:list'), {'page': 2})
+
+        self.assertEqual(response.context['page_obj'].number, 2)
+        self.assertEqual(len(response.context['page_obj']), 2)
+
+    def test_search_matches_patient_name(self):
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse('appointments:list'), {'q': 'Nguyen'})
+
+        self.assertEqual(self.page_appointments(response), [self.own_appointment])
+
+    def test_search_matches_doctor_name_for_admin_and_staff(self):
+        for user in [self.admin, self.staff]:
+            with self.subTest(role=user.profile.role):
+                self.client.force_login(user)
+                response = self.client.get(
+                    reverse('appointments:list'), {'q': 'Bac Si Binh'}
+                )
+                self.assertEqual(
+                    self.page_appointments(response), [self.other_appointment]
+                )
+
+    def test_status_filter_uses_valid_appointment_status(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('appointments:list'), {'status': 'confirmed'}
+        )
+
+        self.assertEqual(self.page_appointments(response), [self.other_appointment])
+
+    def test_date_filter_uses_iso_date(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('appointments:list'), {'date': self.today.isoformat()}
+        )
+
+        self.assertEqual(self.page_appointments(response), [self.own_appointment])
+
+    def test_search_status_and_date_filters_combine(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('appointments:list'), {
+            'q': 'Nguyen', 'status': 'pending', 'date': self.today.isoformat(),
+        })
+
+        self.assertEqual(self.page_appointments(response), [self.own_appointment])
+
+    def test_doctor_filters_cannot_reveal_another_doctors_appointment(self):
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.get(reverse('appointments:list'), {
+            'q': 'Tran Van Binh',
+            'status': 'confirmed',
+            'date': self.tomorrow.isoformat(),
+        })
+
+        self.assertEqual(self.page_appointments(response), [])
+        self.assertNotContains(
+            response, reverse('appointments:detail', args=[self.other_appointment.pk])
+        )
+
+    def test_pagination_link_preserves_combined_filters(self):
+        for index in range(10):
+            self.make_appointment(
+                self.patient, self.doctor, 'pending', self.today, 10 + index
+            )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('appointments:list'), {
+            'q': 'Nguyen', 'status': 'pending', 'date': self.today.isoformat(),
+        })
+
+        expected_query = (
+            f'q=Nguyen&amp;status=pending&amp;date={self.today.isoformat()}&amp;page=2'
+        )
+        self.assertContains(response, expected_query)
+
+    def test_invalid_status_and_date_are_ignored(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('appointments:list'), {
+            'status': 'unknown', 'date': 'not-a-date',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['total'], 2)

@@ -310,3 +310,114 @@ class BillingValueValidationTests(TestCase):
         })
 
         self.assertTrue(form.is_valid())
+
+
+class BillingListFilterTests(TestCase):
+    def setUp(self):
+        self.admin = self.make_user('billing_list_admin', 'admin')
+        self.doctor_user = self.make_user('billing_list_doctor_a', 'doctor')
+        self.other_doctor_user = self.make_user('billing_list_doctor_b', 'doctor')
+        self.doctor = Doctor.objects.create(
+            user=self.doctor_user, full_name='Invoice Doctor A', specialty='General'
+        )
+        self.other_doctor = Doctor.objects.create(
+            user=self.other_doctor_user, full_name='Invoice Doctor B', specialty='General'
+        )
+        self.patient = Patient.objects.create(
+            full_name='Invoice Patient An', date_of_birth='1990-01-01',
+            gender='M', phone='0900000201',
+        )
+        self.other_patient = Patient.objects.create(
+            full_name='Invoice Patient Binh', date_of_birth='1991-01-01',
+            gender='M', phone='0900000202',
+        )
+        self.pending_invoice = self.make_invoice(
+            self.patient, self.doctor, 'Pending', 8
+        )
+        self.paid_invoice = self.make_invoice(
+            self.other_patient, self.other_doctor, 'Paid', 9
+        )
+
+    def make_user(self, username, role):
+        user = User.objects.create_user(username=username)
+        user.profile.role = role
+        user.profile.save()
+        return user
+
+    def make_invoice(self, patient, doctor, status, hour):
+        appointment = Appointment.objects.create(
+            patient=patient, doctor=doctor, date=timezone.localdate(),
+            start_time=time(hour), end_time=time(hour, 30), status='done',
+        )
+        record = MedicalRecord.objects.create(
+            appointment=appointment, symptoms='A', diagnosis='A', treatment='A'
+        )
+        return Invoice.objects.create(medical_record=record, status=status)
+
+    def page_invoices(self, response):
+        return list(response.context['page_obj'].object_list)
+
+    def test_invoice_list_is_paginated_by_ten(self):
+        for index in range(10):
+            self.make_invoice(
+                self.patient, self.doctor, 'Pending', 10 + index
+            )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('billing:list'), {'page': 2})
+
+        self.assertEqual(response.context['page_obj'].number, 2)
+        self.assertEqual(len(response.context['page_obj']), 2)
+
+    def test_invoice_search_matches_patient_name(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('billing:list'), {'q': 'Patient An'})
+
+        self.assertEqual(self.page_invoices(response), [self.pending_invoice])
+
+    def test_pending_and_paid_status_filters(self):
+        self.client.force_login(self.admin)
+
+        pending_response = self.client.get(
+            reverse('billing:list'), {'status': 'Pending'}
+        )
+        paid_response = self.client.get(
+            reverse('billing:list'), {'status': 'Paid'}
+        )
+
+        self.assertEqual(self.page_invoices(pending_response), [self.pending_invoice])
+        self.assertEqual(self.page_invoices(paid_response), [self.paid_invoice])
+
+    def test_doctor_only_sees_own_invoices(self):
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.get(reverse('billing:list'))
+
+        self.assertEqual(self.page_invoices(response), [self.pending_invoice])
+        self.assertNotContains(response, self.other_patient.full_name)
+
+    def test_invoice_search_and_filter_cannot_bypass_doctor_permission(self):
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.get(reverse('billing:list'), {
+            'q': 'Patient Binh', 'status': 'Paid',
+        })
+
+        self.assertEqual(self.page_invoices(response), [])
+        self.assertNotContains(response, self.other_patient.full_name)
+
+    def test_invoice_pagination_link_preserves_search_and_status(self):
+        for index in range(10):
+            self.make_invoice(
+                self.patient, self.doctor, 'Pending', 10 + index
+            )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('billing:list'), {
+            'q': 'Patient An', 'status': 'Pending',
+        })
+
+        self.assertContains(
+            response, 'q=Patient+An&amp;status=Pending&amp;page=2'
+        )

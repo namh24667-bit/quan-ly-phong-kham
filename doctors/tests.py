@@ -339,3 +339,56 @@ class DoctorDeactivateTests(TestCase):
     def test_delete_doctor_with_appointments_is_protected(self):
         with self.assertRaises(ProtectedError):
             self.doctor.delete()
+
+
+class DoctorListPaginationTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = User.objects.create_user(username='doctor_list_admin')
+        cls.admin.profile.role = 'admin'
+        cls.admin.profile.save()
+        cls.staff = User.objects.create_user(username='doctor_list_staff')
+        cls.staff.profile.role = 'staff'
+        cls.staff.profile.save()
+        for index in range(12):
+            Doctor.objects.create(
+                full_name=f'Doctor {index:02d}',
+                specialty='General' if index < 11 else 'Cardiology',
+            )
+
+    def test_doctor_list_is_paginated_by_ten(self):
+        self.client.force_login(self.admin)
+
+        first_page = self.client.get(reverse('doctors:list'))
+        second_page = self.client.get(reverse('doctors:list'), {'page': 2})
+
+        self.assertEqual(len(first_page.context['page_obj']), 10)
+        self.assertEqual(len(second_page.context['page_obj']), 2)
+        self.assertEqual(second_page.context['page_obj'].number, 2)
+
+    def test_search_and_page_work_together(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('doctors:list'), {'q': 'General', 'page': 2}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['total'], 11)
+        self.assertEqual(response.context['page_obj'].number, 2)
+        self.assertContains(response, 'General')
+
+    def test_doctor_list_actions_keep_admin_and_staff_permissions(self):
+        create_url = reverse('doctors:create')
+        doctor = Doctor.objects.first()
+        update_url = reverse('doctors:update', args=[doctor.pk])
+
+        self.client.force_login(self.admin)
+        admin_response = self.client.get(reverse('doctors:list'))
+        self.assertContains(admin_response, create_url)
+        self.assertContains(admin_response, update_url)
+
+        self.client.force_login(self.staff)
+        staff_response = self.client.get(reverse('doctors:list'))
+        self.assertNotContains(staff_response, create_url)
+        self.assertNotContains(staff_response, update_url)

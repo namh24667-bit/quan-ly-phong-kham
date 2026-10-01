@@ -3,7 +3,7 @@
 {% block page_title %}Danh Sách Bác Sĩ{% endblock %}
 {% block content %}
 <div class="page-actions mb-3">
-    <small class="text-muted">Tổng: {{ total }} bác sĩ</small>
+    <small class="text-muted">{% if query %}{{ total }} kết quả cho "{{ query }}"{% else %}Tổng: {{ total }} bác sĩ{% endif %}</small>
     {% if is_admin %}<a href="{% url 'doctors:create' %}" class="btn btn-success"><i class="bi bi-plus-circle me-1"></i>Thêm Bác Sĩ</a>{% endif %}
 </div>
 <div class="card mb-3 shadow-sm">
@@ -23,9 +23,9 @@
         <table class="table table-hover table-striped mb-0">
             <thead class="table-dark"><tr><th>#</th><th>Họ tên</th><th>Chuyên khoa</th><th>SĐT</th><th>Trạng thái</th><th class="text-center">Lịch hẹn</th><th class="text-center">Hành động</th></tr></thead>
             <tbody>
-                {% for d in doctors %}
+                {% for d in page_obj %}
                 <tr>
-                    <td class="text-muted">{{ forloop.counter }}</td>
+                    <td class="text-muted">{{ page_obj.start_index|add:forloop.counter0 }}</td>
                     <td><a href="{% url 'doctors:detail' pk=d.pk %}" class="fw-semibold text-decoration-none">BS. {{ d.full_name }}</a></td>
                     <td><span class="badge bg-info text-dark">{{ d.specialty }}</span></td>
                     <td>{{ d.phone|default:"—" }}</td>
@@ -40,11 +40,12 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="7" class="text-center py-5 text-muted"><i class="bi bi-person-x fs-1 d-block mb-2"></i>Chưa có bác sĩ.{% if is_admin %} <a href="{% url 'doctors:create' %}">Thêm ngay</a>{% endif %}</td></tr>
+                <tr><td colspan="7" class="text-center py-5 text-muted"><i class="bi bi-person-x fs-1 d-block mb-2"></i>{% if query %}Không tìm thấy bác sĩ phù hợp.{% else %}Chưa có bác sĩ.{% if is_admin %} <a href="{% url 'doctors:create' %}">Thêm ngay</a>{% endif %}{% endif %}</td></tr>
                 {% endfor %}
             </tbody>
         </table>
         </div>
+        {% include 'includes/pagination.html' %}
     </div>
 </div>
 {% endblock %}

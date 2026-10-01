@@ -2,8 +2,11 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.core.paginator import Paginator
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from accounts.decorators import role_required
 from .models import Appointment, MedicalRecord
 from .forms import AppointmentForm, MedicalRecordForm
@@ -76,22 +79,50 @@ def appointment_update(request, pk):
 @login_required
 @role_required('admin', 'staff', 'doctor')
 def appointment_list(request):
-    appointments = Appointment.objects.select_related('patient', 'doctor').order_by('-date', '-start_time')
+    appointments = Appointment.objects.select_related('patient', 'doctor')
     if not request.user.is_superuser and request.user.profile.role == 'doctor':
         if not hasattr(request.user, 'doctor'):
             raise PermissionDenied
         appointments = appointments.filter(doctor=request.user.doctor)
-    status_filter = request.GET.get('status', '')
-    date_filter   = request.GET.get('date', '')
+
+    query = request.GET.get('q', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    date_filter = request.GET.get('date', '').strip()
+
+    if query:
+        appointments = appointments.filter(
+            Q(patient__full_name__icontains=query)
+            | Q(doctor__full_name__icontains=query)
+        )
+
+    valid_statuses = dict(Appointment.STATUS_CHOICES)
+    if status_filter not in valid_statuses:
+        status_filter = ''
     if status_filter:
         appointments = appointments.filter(status=status_filter)
-    if date_filter:
-        appointments = appointments.filter(date=date_filter)
+
+    parsed_date = parse_date(date_filter) if date_filter else None
+    if parsed_date:
+        appointments = appointments.filter(date=parsed_date)
+    elif date_filter:
+        date_filter = ''
+
+    appointments = appointments.order_by('-date', '-start_time', '-pk')
+    paginator = Paginator(appointments, 10)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+    query_params = request.GET.copy()
+    query_params.pop('page', None)
+
     return render(request, 'appointments/appointment_list.html', {
-        'appointments': appointments,
+        'appointments': page_obj,
+        'page_obj': page_obj,
+        'query': query,
         'status_filter': status_filter,
         'date_filter': date_filter,
         'status_choices': Appointment.STATUS_CHOICES,
+        'query_string': query_params.urlencode(),
+        'total': paginator.count,
+        'has_filters': bool(query or status_filter or date_filter),
     })
 
 

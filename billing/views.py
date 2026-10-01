@@ -1,7 +1,9 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.core.paginator import Paginator
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
 from accounts.decorators import role_required
@@ -17,12 +19,36 @@ def invoice_list(request):
         'medical_record__appointment__patient',
         'medical_record__appointment__doctor',
     ).prefetch_related('services')
-    status = request.GET.get('status', '')
-    if status in dict(Invoice.STATUS_CHOICES):
-        invoices = invoices.filter(status=status)
     if not request.user.is_superuser and request.user.profile.role == 'doctor':
         invoices = invoices.filter(medical_record__appointment__doctor__user=request.user)
-    return render(request, 'billing/invoice_list.html', {'invoices': invoices, 'status_filter': status})
+
+    query = request.GET.get('q', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    if query:
+        invoices = invoices.filter(
+            Q(medical_record__appointment__patient__full_name__icontains=query)
+        )
+    if status_filter not in dict(Invoice.STATUS_CHOICES):
+        status_filter = ''
+    if status_filter:
+        invoices = invoices.filter(status=status_filter)
+
+    invoices = invoices.order_by('-created_at', '-pk')
+    paginator = Paginator(invoices, 10)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+    query_params = request.GET.copy()
+    query_params.pop('page', None)
+
+    return render(request, 'billing/invoice_list.html', {
+        'invoices': page_obj,
+        'page_obj': page_obj,
+        'query': query,
+        'status_filter': status_filter,
+        'status_choices': Invoice.STATUS_CHOICES,
+        'query_string': query_params.urlencode(),
+        'total': paginator.count,
+        'has_filters': bool(query or status_filter),
+    })
 
 
 @login_required
