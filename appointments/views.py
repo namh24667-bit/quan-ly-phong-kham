@@ -45,6 +45,8 @@ def appointment_create(request):
 @role_required('admin', 'staff')
 def appointment_update(request, pk):
     appointment = get_object_or_404(Appointment, pk=pk)
+    if appointment.status not in ['pending', 'confirmed']:
+        raise PermissionDenied
     if request.method == 'POST':
         form = AppointmentForm(request.POST, instance=appointment)
         if form.is_valid():
@@ -257,6 +259,8 @@ def update_medical_record(request, pk):
         doctor = request.user.doctor
         if record.appointment.doctor != doctor:
             raise PermissionDenied
+    if record.appointment.status != 'checked_in':
+        raise PermissionDenied
     if request.method == 'POST':
         form = MedicalRecordForm(request.POST, instance=record, doctor=doctor)
         prescription_formset = PrescriptionFormSet(request.POST, instance=record)

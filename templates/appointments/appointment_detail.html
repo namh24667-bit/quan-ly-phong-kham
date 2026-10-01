@@ -11,7 +11,9 @@
             <div class="card-body">
                 <p><strong>Chẩn đoán:</strong> {{ appointment.medical_record.diagnosis }}</p>
                 <p><strong>Điều trị:</strong> {{ appointment.medical_record.treatment }}</p>
-                <a href="{% url 'appointments:medical_record_update' appointment.medical_record.pk %}" class="btn btn-outline-primary btn-sm">Sửa hồ sơ và đơn thuốc</a>
+                {% if appointment.status == 'checked_in' %}
+                {% if is_admin or is_doctor %}<a href="{% url 'appointments:medical_record_update' appointment.medical_record.pk %}" class="btn btn-outline-primary btn-sm">Sửa hồ sơ và đơn thuốc</a>{% endif %}
+                {% endif %}
                 {% if appointment.medical_record.invoice %}<a href="{% url 'billing:detail' appointment.medical_record.invoice.pk %}" class="btn btn-outline-success btn-sm">Xem hóa đơn</a>{% endif %}
             </div>
         </div>
@@ -61,9 +63,11 @@
                 {% elif appointment.status == 'cancelled' %}
                 <p class="text-center text-muted mb-0"><i class="bi bi-x-circle-fill text-danger"></i> Đã hủy.</p>
                 {% endif %}
-                {% if appointment.status not in 'done,cancelled' %}
+                {% if is_admin_or_staff %}
+                {% if appointment.status == 'pending' or appointment.status == 'confirmed' %}
                 <hr class="my-1">
                 <a href="{% url 'appointments:update' appointment.pk %}" class="btn btn-outline-secondary btn-sm w-100"><i class="bi bi-pencil me-1"></i>Chỉnh sửa</a>
+                {% endif %}
                 {% endif %}
             </div>
         </div>
