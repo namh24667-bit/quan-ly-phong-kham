@@ -35,7 +35,7 @@
                         <td class="text-center">
                             <a href="{% url 'patients:detail' pk=p.pk %}" class="btn btn-sm btn-outline-info"><i class="bi bi-eye"></i></a>
                             <a href="{% url 'patients:update' pk=p.pk %}" class="btn btn-sm btn-outline-warning"><i class="bi bi-pencil"></i></a>
-                            <a href="{% url 'patients:delete' pk=p.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                            <a href="{% url 'patients:delete' pk=p.pk %}" class="btn btn-sm btn-outline-danger" title="Ngừng hoạt động"><i class="bi bi-archive"></i></a>
                         </td>
                     </tr>
                     {% endfor %}

@@ -1,4 +1,8 @@
 from django import forms
+from django.db.models import Q
+
+from patients.models import Patient
+
 from .models import Appointment, MedicalRecord
 
 
@@ -20,6 +24,15 @@ class AppointmentForm(forms.ModelForm):
             'date': 'Ngày khám', 'start_time': 'Giờ bắt đầu',
             'end_time': 'Giờ kết thúc', 'note': 'Ghi chú',
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        patients = Patient.objects.filter(is_active=True)
+        if self.instance.pk and self.instance.patient_id:
+            patients = Patient.objects.filter(
+                Q(is_active=True) | Q(pk=self.instance.patient_id)
+            )
+        self.fields['patient'].queryset = patients
 
     def clean(self):
         cleaned_data = super().clean()

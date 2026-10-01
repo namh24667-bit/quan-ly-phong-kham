@@ -13,7 +13,7 @@ from .forms import PatientForm
 @role_required('admin', 'staff', 'doctor')
 def patient_list(request):
     query = request.GET.get('q', '').strip()
-    patients = Patient.objects.all()
+    patients = Patient.objects.filter(is_active=True)
     if not request.user.is_superuser and request.user.profile.role == 'doctor':
         if not hasattr(request.user, 'doctor'):
             raise PermissionDenied
@@ -71,8 +71,9 @@ def patient_delete(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     if request.method == 'POST':
         name = patient.full_name
-        patient.delete()
-        messages.success(request, f'Đã xóa bệnh nhân {name}.')
+        patient.is_active = False
+        patient.save(update_fields=['is_active'])
+        messages.success(request, f'Đã ngừng hoạt động bệnh nhân {name}.')
         return redirect('patients:list')
     return render(request, 'patients/patient_confirm_delete.html', {'patient': patient})
 

@@ -13,6 +13,7 @@ class Patient(models.Model):
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES, verbose_name='Giới tính')
     phone = models.CharField(max_length=15, verbose_name='Số điện thoại')
     address = models.TextField(blank=True, verbose_name='Địa chỉ')
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Ngày tạo')
 
     class Meta:

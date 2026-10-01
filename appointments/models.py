@@ -11,7 +11,7 @@ class Appointment(models.Model):
         ('done', 'Hoàn thành'),
         ('cancelled', 'Đã hủy'),
     ]
-    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, verbose_name='Bệnh nhân')
+    patient = models.ForeignKey(Patient, on_delete=models.PROTECT, verbose_name='Bệnh nhân')
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, verbose_name='Bác sĩ')
     date = models.DateField(verbose_name='Ngày khám')
     start_time = models.TimeField(verbose_name='Giờ bắt đầu')
