@@ -40,7 +40,7 @@ class Appointment(models.Model):
 
 
 class MedicalRecord(models.Model):
-    appointment = models.OneToOneField(Appointment, on_delete=models.CASCADE,
+    appointment = models.OneToOneField(Appointment, on_delete=models.PROTECT,
                                        related_name='medical_record')
     symptoms = models.TextField(verbose_name='Triệu chứng')
     diagnosis = models.TextField(verbose_name='Chẩn đoán')

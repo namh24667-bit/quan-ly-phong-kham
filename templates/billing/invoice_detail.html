@@ -28,15 +28,26 @@
             <div><span>Ngày tạo hóa đơn</span><strong>{{ invoice.created_at|date:'d/m/Y H:i' }}</strong></div>
         </section>
 
+        {% if snapshot_warning %}
+        <div class="alert alert-warning" role="alert">{{ snapshot_warning }}</div>
+        {% endif %}
+
+        {% if paid_snapshot or invoice.status == 'Pending' %}
         <section class="document-section">
             <div class="section-heading"><h3>Chi phí thuốc</h3></div>
             <div class="table-responsive">
                 <table class="table document-table mb-0">
-                    <thead><tr><th>Tên thuốc</th><th>Số lượng</th><th>Liều dùng</th><th class="text-end">Thành tiền</th></tr></thead>
+                    <thead><tr><th>Tên thuốc</th><th>Số lượng</th><th>Liều dùng</th><th class="text-end">Đơn giá</th><th class="text-end">Thành tiền</th></tr></thead>
                     <tbody>
+                        {% if paid_snapshot %}
+                        {% for item in paid_snapshot.medicines %}
+                        <tr><td class="fw-semibold">{{ item.name }}</td><td>{{ item.quantity }} {{ item.unit }}</td><td>{{ item.dosage }}</td><td class="text-end text-nowrap">{{ item.unit_price|floatformat:2 }} đ</td><td class="text-end text-nowrap">{{ item.line_total|floatformat:2 }} đ</td></tr>
+                        {% empty %}<tr><td colspan="5" class="text-center text-muted py-3">Không có thuốc.</td></tr>{% endfor %}
+                        {% else %}
                         {% for item in invoice.medical_record.prescriptions.all %}
-                        <tr><td class="fw-semibold">{{ item.medicine.name }}</td><td>{{ item.quantity }} {{ item.medicine.unit }}</td><td>{{ item.dosage }}</td><td class="text-end text-nowrap">{{ item.amount|floatformat:0 }} đ</td></tr>
-                        {% empty %}<tr><td colspan="4" class="text-center text-muted py-3">Không có thuốc.</td></tr>{% endfor %}
+                        <tr><td class="fw-semibold">{{ item.medicine.name }}</td><td>{{ item.quantity }} {{ item.medicine.unit }}</td><td>{{ item.dosage }}</td><td class="text-end text-nowrap">{{ item.medicine.unit_price|floatformat:0 }} đ</td><td class="text-end text-nowrap">{{ item.amount|floatformat:0 }} đ</td></tr>
+                        {% empty %}<tr><td colspan="5" class="text-center text-muted py-3">Không có thuốc.</td></tr>{% endfor %}
+                        {% endif %}
                     </tbody>
                 </table>
             </div>
@@ -45,16 +56,33 @@
         <section class="document-section">
             <div class="section-heading"><h3>Dịch vụ</h3></div>
             <div class="document-lines">
+                {% if paid_snapshot %}
+                {% for service in paid_snapshot.services %}
+                <div><span>{{ service.name }}</span><strong>{{ service.line_total|floatformat:2 }} đ</strong></div>
+                {% empty %}<p class="text-center text-muted py-2 mb-0">Không có dịch vụ.</p>{% endfor %}
+                {% else %}
                 {% for service in invoice.services.all %}
                 <div><span>{{ service.name }}</span><strong>{{ service.price|floatformat:0 }} đ</strong></div>
                 {% empty %}<p class="text-center text-muted py-2 mb-0">Không có dịch vụ.</p>{% endfor %}
+                {% endif %}
             </div>
         </section>
+        {% endif %}
 
         <footer class="invoice-summary">
+            {% if paid_snapshot %}
+            <div><span>Tiền thuốc</span><strong>{{ paid_snapshot.totals.medicine_total|floatformat:2 }} đ</strong></div>
+            <div><span>Tiền dịch vụ</span><strong>{{ paid_snapshot.totals.service_total|floatformat:2 }} đ</strong></div>
+            <div class="invoice-total"><span>Tổng cộng</span><strong>{{ paid_snapshot.totals.total_amount|floatformat:2 }} đ</strong></div>
+            {% elif invoice.status == 'Paid' %}
+            <div><span>Tiền thuốc</span><strong>{{ invoice.medicine_total|floatformat:2 }} đ</strong></div>
+            <div><span>Tiền dịch vụ</span><strong>{{ invoice.service_total|floatformat:2 }} đ</strong></div>
+            <div class="invoice-total"><span>Tổng cộng</span><strong>{{ invoice.total_amount|floatformat:2 }} đ</strong></div>
+            {% else %}
             <div><span>Tiền thuốc</span><strong>{{ invoice.medicine_total|floatformat:0 }} đ</strong></div>
             <div><span>Tiền dịch vụ</span><strong>{{ invoice.service_total|floatformat:0 }} đ</strong></div>
             <div class="invoice-total"><span>Tổng cộng</span><strong>{{ invoice.total_amount|floatformat:0 }} đ</strong></div>
+            {% endif %}
             <div class="invoice-status"><span>Trạng thái</span><span class="badge bg-{% if invoice.status == 'Paid' %}success{% else %}warning text-dark{% endif %}">{{ invoice.get_status_display }}</span></div>
         </footer>
 

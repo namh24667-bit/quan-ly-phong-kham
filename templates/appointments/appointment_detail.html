@@ -55,9 +55,11 @@
                 {% endif %}
                 {% elif appointment.status == 'confirmed' %}
                 {% if is_admin_or_staff %}
+                {% if appointment.date == today and appointment.doctor.is_active %}
                 <form method="post" action="{% url 'appointments:checkin' appointment.pk %}">{% csrf_token %}
                     <button type="submit" class="btn btn-info w-100 text-white" onclick="return confirm('Bệnh nhân đã đến?')"><i class="bi bi-box-arrow-in-right me-1"></i>Check-in</button>
                 </form>
+                {% endif %}
                 <form method="post" action="{% url 'appointments:cancel' appointment.pk %}">{% csrf_token %}
                     <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm('Hủy lịch?')"><i class="bi bi-x-circle me-1"></i>Hủy lịch</button>
                 </form>
@@ -65,9 +67,11 @@
                 {% elif appointment.status == 'checked_in' %}
                 {% if appointment.medical_record %}
                 {% if is_admin or is_doctor %}
+                {% if appointment.date <= today %}
                 <form method="post" action="{% url 'appointments:done' appointment.pk %}">{% csrf_token %}
                     <button type="submit" class="btn btn-success w-100" onclick="return confirm('Đánh dấu hoàn thành?')"><i class="bi bi-check2-all me-1"></i>Hoàn thành</button>
                 </form>
+                {% endif %}
                 {% endif %}
                 {% endif %}
                 {% elif appointment.status == 'done' %}

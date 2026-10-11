@@ -1,6 +1,8 @@
-from datetime import timedelta, time
+from datetime import datetime, time, timedelta, timezone as datetime_timezone
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.contrib.messages import get_messages
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -879,3 +881,217 @@ class AppointmentListFilterTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['total'], 2)
+
+
+class AppointmentCheckinDayTests(TestCase):
+    def setUp(self):
+        self.admin = self.make_user('day_admin', 'admin')
+        self.staff = self.make_user('day_staff', 'staff')
+        self.doctor_user = self.make_user('day_doctor', 'doctor')
+        self.doctor = Doctor.objects.create(
+            user=self.doctor_user, full_name='Day Doctor', specialty='General',
+        )
+        self.patient = Patient.objects.create(
+            full_name='Day Patient', date_of_birth='1990-01-01',
+            gender='M', phone='0900000401',
+        )
+        self.today = timezone.localdate()
+
+    @staticmethod
+    def make_user(username, role):
+        user = User.objects.create_user(username=username)
+        user.profile.role = role
+        user.profile.save()
+        return user
+
+    def make_appointment(self, status='confirmed', date=None, start_time=time(9)):
+        return Appointment.objects.create(
+            patient=self.patient, doctor=self.doctor,
+            date=date if date is not None else self.today,
+            start_time=start_time, end_time=time(10), status=status,
+        )
+
+    def assert_checkin_denied(self, appointment, message):
+        before = Appointment.objects.filter(pk=appointment.pk).values().get()
+        response = self.client.post(
+            reverse('appointments:checkin', args=[appointment.pk])
+        )
+        self.assertRedirects(
+            response, reverse('appointments:detail', args=[appointment.pk]),
+            fetch_redirect_response=False,
+        )
+        self.assertIn(
+            message, [str(item) for item in get_messages(response.wsgi_request)]
+        )
+        self.assertEqual(
+            Appointment.objects.filter(pk=appointment.pk).values().get(), before
+        )
+
+    def test_admin_and_staff_can_check_in_confirmed_appointment_today(self):
+        for user in (self.admin, self.staff):
+            with self.subTest(role=user.profile.role):
+                appointment = self.make_appointment()
+                self.client.force_login(user)
+
+                response = self.client.post(
+                    reverse('appointments:checkin', args=[appointment.pk])
+                )
+
+                self.assertEqual(response.status_code, 302)
+                appointment.refresh_from_db()
+                self.assertEqual(appointment.status, 'checked_in')
+
+    def test_confirmed_appointment_tomorrow_cannot_check_in(self):
+        appointment = self.make_appointment(date=self.today + timedelta(days=1))
+        self.client.force_login(self.staff)
+
+        self.assert_checkin_denied(appointment, 'Chỉ có thể check-in vào đúng ngày khám.')
+
+    def test_confirmed_appointment_yesterday_cannot_check_in(self):
+        appointment = self.make_appointment(date=self.today - timedelta(days=1))
+        self.client.force_login(self.staff)
+
+        self.assert_checkin_denied(appointment, 'Chỉ có thể check-in vào đúng ngày khám.')
+
+    def test_pending_cancelled_done_and_checked_in_cannot_check_in(self):
+        self.client.force_login(self.staff)
+        for status in ('pending', 'cancelled', 'done', 'checked_in'):
+            with self.subTest(status=status):
+                appointment = self.make_appointment(status=status)
+                self.assert_checkin_denied(
+                    appointment, 'Phải ở trạng thái "Đã xác nhận" mới check-in được.'
+                )
+
+    def test_inactive_doctor_blocks_check_in(self):
+        appointment = self.make_appointment()
+        self.doctor.is_active = False
+        self.doctor.save(update_fields=['is_active'])
+        self.client.force_login(self.staff)
+
+        self.assert_checkin_denied(
+            appointment, 'Không thể check-in vì bác sĩ đã ngừng hoạt động.'
+        )
+
+    def test_doctor_cannot_check_in_own_confirmed_appointment(self):
+        appointment = self.make_appointment()
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.post(
+            reverse('appointments:checkin', args=[appointment.pk])
+        )
+
+        self.assertRedirects(
+            response, reverse('dashboard:index'), fetch_redirect_response=False
+        )
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, 'confirmed')
+
+    def test_check_in_button_only_shows_for_today_and_active_doctor(self):
+        today = self.make_appointment()
+        tomorrow = self.make_appointment(date=self.today + timedelta(days=1))
+        yesterday = self.make_appointment(date=self.today - timedelta(days=1))
+        self.client.force_login(self.staff)
+
+        self.assertContains(
+            self.client.get(reverse('appointments:detail', args=[today.pk])),
+            reverse('appointments:checkin', args=[today.pk]),
+        )
+        for appointment in (tomorrow, yesterday):
+            with self.subTest(date=appointment.date):
+                self.assertNotContains(
+                    self.client.get(reverse('appointments:detail', args=[appointment.pk])),
+                    reverse('appointments:checkin', args=[appointment.pk]),
+                )
+        self.doctor.is_active = False
+        self.doctor.save(update_fields=['is_active'])
+        self.assertNotContains(
+            self.client.get(reverse('appointments:detail', args=[today.pk])),
+            reverse('appointments:checkin', args=[today.pk]),
+        )
+
+    def test_cannot_finish_future_checked_in_appointment_with_record(self):
+        for user in (self.admin, self.doctor_user):
+            with self.subTest(role=user.profile.role):
+                appointment = self.make_appointment(
+                    status='checked_in', date=self.today + timedelta(days=1)
+                )
+                MedicalRecord.objects.create(
+                    appointment=appointment, symptoms='A',
+                    diagnosis='A', treatment='A',
+                )
+                self.client.force_login(user)
+
+                response = self.client.post(
+                    reverse('appointments:done', args=[appointment.pk])
+                )
+
+                self.assertRedirects(
+                    response, reverse('appointments:detail', args=[appointment.pk]),
+                    fetch_redirect_response=False,
+                )
+                self.assertIn(
+                    'Không thể hoàn thành lịch khám trước ngày khám.',
+                    [str(item) for item in get_messages(response.wsgi_request)],
+                )
+                appointment.refresh_from_db()
+                self.assertEqual(appointment.status, 'checked_in')
+                self.assertNotContains(
+                    self.client.get(reverse('appointments:detail', args=[appointment.pk])),
+                    reverse('appointments:done', args=[appointment.pk]),
+                )
+
+    def test_checked_in_yesterday_can_be_finished_late(self):
+        for user in (self.admin, self.doctor_user):
+            with self.subTest(role=user.profile.role):
+                appointment = self.make_appointment(
+                    status='checked_in', date=self.today - timedelta(days=1)
+                )
+                MedicalRecord.objects.create(
+                    appointment=appointment, symptoms='A',
+                    diagnosis='A', treatment='A',
+                )
+                self.client.force_login(user)
+                self.assertContains(
+                    self.client.get(reverse('appointments:detail', args=[appointment.pk])),
+                    reverse('appointments:done', args=[appointment.pk]),
+                )
+
+                response = self.client.post(
+                    reverse('appointments:done', args=[appointment.pk])
+                )
+
+                self.assertEqual(response.status_code, 302)
+                appointment.refresh_from_db()
+                self.assertEqual(appointment.status, 'done')
+
+    def test_local_day_near_midnight_uses_django_timezone(self):
+        local_day = datetime(2030, 1, 2).date()
+        local_yesterday = local_day - timedelta(days=1)
+        today_appointment = self.make_appointment(date=local_day)
+        old_appointment = self.make_appointment(date=local_yesterday)
+        utc_instant = datetime(2030, 1, 1, 17, 30, tzinfo=datetime_timezone.utc)
+        with timezone.override('Asia/Ho_Chi_Minh'):
+            with patch('django.utils.timezone.now', return_value=utc_instant):
+                self.assertEqual(timezone.localdate(), local_day)
+                self.client.force_login(self.staff)
+                response = self.client.post(
+                    reverse('appointments:checkin', args=[today_appointment.pk])
+                )
+                self.assertEqual(response.status_code, 302)
+                self.assert_checkin_denied(
+                    old_appointment, 'Chỉ có thể check-in vào đúng ngày khám.'
+                )
+        today_appointment.refresh_from_db()
+        self.assertEqual(today_appointment.status, 'checked_in')
+
+    def test_today_check_in_does_not_depend_on_start_hour(self):
+        appointment = self.make_appointment(start_time=time(0))
+        self.client.force_login(self.staff)
+
+        response = self.client.post(
+            reverse('appointments:checkin', args=[appointment.pk])
+        )
+
+        self.assertEqual(response.status_code, 302)
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, 'checked_in')
