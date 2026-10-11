@@ -25,7 +25,7 @@ class Medicine(models.Model):
 
 class Prescription(models.Model):
     medical_record = models.ForeignKey(
-        MedicalRecord, on_delete=models.CASCADE, related_name='prescriptions',
+        MedicalRecord, on_delete=models.PROTECT, related_name='prescriptions',
         verbose_name='Hồ sơ khám',
     )
     medicine = models.ForeignKey(Medicine, on_delete=models.PROTECT, verbose_name='Thuốc')
@@ -68,7 +68,7 @@ class Invoice(models.Model):
         ('Paid', 'Đã thanh toán'),
     ]
     medical_record = models.OneToOneField(
-        MedicalRecord, on_delete=models.CASCADE, related_name='invoice',
+        MedicalRecord, on_delete=models.PROTECT, related_name='invoice',
         verbose_name='Hồ sơ khám',
     )
     services = models.ManyToManyField(Service, blank=True, related_name='invoices', verbose_name='Dịch vụ')
