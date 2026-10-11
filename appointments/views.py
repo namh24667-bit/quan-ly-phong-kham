@@ -137,7 +137,9 @@ def appointment_detail(request, pk):
             and request.user.profile.role == 'doctor'
             and appointment.doctor.user != request.user):
         raise PermissionDenied
-    return render(request, 'appointments/appointment_detail.html', {'appointment': appointment})
+    return render(request, 'appointments/appointment_detail.html', {
+        'appointment': appointment, 'today': timezone.localdate(),
+    })
 
 
 # ─── XÁC NHẬN (pending -> confirmed) ─────────────────────────────
@@ -166,6 +168,12 @@ def appointment_checkin(request, pk):
     if appointment.status != 'confirmed':
         messages.error(request, f'Phải ở trạng thái "Đã xác nhận" mới check-in được.')
         return redirect('appointments:detail', pk=pk)
+    if appointment.date != timezone.localdate():
+        messages.error(request, 'Chỉ có thể check-in vào đúng ngày khám.')
+        return redirect('appointments:detail', pk=pk)
+    if not appointment.doctor.is_active:
+        messages.error(request, 'Không thể check-in vì bác sĩ đã ngừng hoạt động.')
+        return redirect('appointments:detail', pk=pk)
     appointment.status = 'checked_in'
     appointment.save()
     messages.success(request, 'Check-in thành công!')
@@ -188,6 +196,9 @@ def appointment_done(request, pk):
         return redirect('appointments:detail', pk=pk)
     if not hasattr(appointment, 'medical_record'):
         raise PermissionDenied
+    if appointment.date > timezone.localdate():
+        messages.error(request, 'Không thể hoàn thành lịch khám trước ngày khám.')
+        return redirect('appointments:detail', pk=pk)
     appointment.status = 'done'
     appointment.save()
     messages.success(request, 'Lịch hẹn đã hoàn thành!')
