@@ -1,5 +1,7 @@
 from decimal import Decimal
 from datetime import time
+from copy import deepcopy
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -433,4 +435,197 @@ class BillingListFilterTests(TestCase):
 
         self.assertContains(
             response, 'q=Patient+An&amp;status=Pending&amp;page=2'
+        )
+
+
+class PaidInvoiceSnapshotTests(TestCase):
+    def setUp(self):
+        self.staff = User.objects.create_user(username='snapshot_staff')
+        self.staff.profile.role = 'staff'
+        self.staff.profile.save()
+        self.admin = User.objects.create_user(username='snapshot_admin')
+        self.admin.profile.role = 'admin'
+        self.admin.profile.save()
+        patient = Patient.objects.create(
+            full_name='Bệnh nhân An', date_of_birth='1990-01-01',
+            gender='M', phone='0900000301',
+        )
+        doctor = Doctor.objects.create(full_name='Bác sĩ Bình', specialty='General')
+        self.appointment = Appointment.objects.create(
+            patient=patient, doctor=doctor, date=timezone.localdate(),
+            start_time=time(9), end_time=time(9, 30), status='done',
+        )
+        self.record = MedicalRecord.objects.create(
+            appointment=self.appointment, symptoms='A', diagnosis='A', treatment='A',
+        )
+        self.medicine = Medicine.objects.create(
+            name='Thuốc cảm', unit='viên', unit_price=Decimal('12.34'),
+        )
+        self.prescription = Prescription.objects.create(
+            medical_record=self.record, medicine=self.medicine,
+            quantity=3, dosage='Ngày 2 viên sau ăn',
+        )
+        self.service = Service.objects.create(name='Khám tổng quát', price=Decimal('5.67'))
+        self.invoice = Invoice.objects.create(medical_record=self.record)
+        self.invoice.services.add(self.service)
+        self.client.force_login(self.staff)
+
+    def pay(self):
+        return self.client.post(reverse('billing:mark_paid', args=[self.invoice.pk]))
+
+    def detail(self):
+        return self.client.get(reverse('billing:detail', args=[self.invoice.pk]))
+
+    def test_pending_has_no_snapshot_and_still_shows_live_lines(self):
+        self.invoice.refresh_from_db()
+        self.assertIsNone(self.invoice.paid_snapshot)
+        self.assertContains(self.detail(), 'Thuốc cảm')
+        self.assertContains(self.detail(), 'Khám tổng quát')
+
+    def test_payment_captures_complete_versioned_snapshot_and_exact_totals(self):
+        self.assertEqual(self.pay().status_code, 302)
+        self.invoice.refresh_from_db()
+        snapshot = self.invoice.paid_snapshot
+        self.assertEqual(self.invoice.status, 'Paid')
+        self.assertEqual(snapshot['schema_version'], 1)
+        self.assertEqual(snapshot['source'], 'captured_at_payment')
+        self.assertTrue(snapshot['captured_at'])
+        self.assertEqual(snapshot['medicines'], [{
+            'prescription_id': self.prescription.pk,
+            'medicine_id': self.medicine.pk,
+            'name': 'Thuốc cảm', 'unit': 'viên', 'quantity': 3,
+            'dosage': 'Ngày 2 viên sau ăn', 'unit_price': '12.34',
+            'line_total': '37.02',
+        }])
+        self.assertEqual(snapshot['services'], [{
+            'service_id': self.service.pk, 'name': 'Khám tổng quát',
+            'unit_price': '5.67', 'line_total': '5.67',
+        }])
+        self.assertEqual(snapshot['totals'], {
+            'medicine_total': '37.02', 'service_total': '5.67',
+            'total_amount': '42.69',
+        })
+        self.assertEqual(self.invoice.total_amount, Decimal('42.69'))
+        self.assertEqual(self.invoice.validate_paid_snapshot(snapshot), snapshot)
+
+    def test_paid_detail_and_print_keep_medicine_name_unit_and_price(self):
+        self.pay()
+        self.medicine.name = 'Tên mới'
+        self.medicine.unit = 'hộp'
+        self.medicine.unit_price = Decimal('999.99')
+        self.medicine.save()
+        response = self.detail()
+        self.assertContains(response, 'Thuốc cảm')
+        self.assertContains(response, 'viên')
+        self.assertContains(response, '12,34')
+        self.assertNotContains(response, 'Tên mới')
+        self.assertNotContains(response, '999,99')
+        self.assertContains(response, 'onclick="window.print()"')
+
+    def test_paid_detail_keeps_service_name_and_price_after_catalog_change(self):
+        self.pay()
+        self.service.name = 'Tên dịch vụ mới'
+        self.service.price = Decimal('999.99')
+        self.service.save()
+        response = self.detail()
+        self.assertContains(response, 'Khám tổng quát')
+        self.assertContains(response, '5,67')
+        self.assertNotContains(response, 'Tên dịch vụ mới')
+
+    def test_deleted_service_still_appears_from_paid_snapshot(self):
+        self.pay()
+        self.service.delete()
+        self.assertContains(self.detail(), 'Khám tổng quát')
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.paid_snapshot['services'][0]['line_total'], '5.67')
+
+    def test_changed_service_links_do_not_change_paid_print(self):
+        self.pay()
+        other = Service.objects.create(name='Dịch vụ mới', price='999.99')
+        self.invoice.services.set([other])
+        response = self.detail()
+        self.assertContains(response, 'Khám tổng quát')
+        self.assertNotContains(response, 'Dịch vụ mới')
+
+    def test_payment_cannot_repeat_or_replace_snapshot(self):
+        self.pay()
+        self.invoice.refresh_from_db()
+        original = deepcopy(self.invoice.paid_snapshot)
+        self.assertEqual(self.pay().status_code, 403)
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.paid_snapshot, original)
+        self.assertEqual(self.invoice.total_amount, Decimal('42.69'))
+
+    def test_appointment_must_be_done_before_payment(self):
+        self.appointment.status = 'checked_in'
+        self.appointment.save(update_fields=['status'])
+        self.assertEqual(self.pay().status_code, 403)
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, 'Pending')
+        self.assertIsNone(self.invoice.paid_snapshot)
+
+    def test_failed_capture_rolls_back_recalculated_totals_and_status(self):
+        with patch.object(Invoice, 'build_paid_snapshot', side_effect=ValueError('capture failed')):
+            with self.assertRaisesMessage(ValueError, 'capture failed'):
+                self.pay()
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, 'Pending')
+        self.assertIsNone(self.invoice.paid_snapshot)
+        self.assertEqual(self.invoice.total_amount, Decimal('0.00'))
+
+    def test_legacy_paid_invoice_shows_only_stored_totals(self):
+        self.invoice.recalculate()
+        self.invoice.status = 'Paid'
+        self.invoice.save(update_fields=['status'])
+        response = self.detail()
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'chưa có bản lưu chi tiết')
+        self.assertContains(response, '42,69')
+        self.assertNotContains(response, 'Thuốc cảm')
+        self.assertNotContains(response, 'Khám tổng quát')
+
+    def test_malformed_and_unsupported_snapshots_never_fall_back_to_catalog(self):
+        self.pay()
+        self.invoice.refresh_from_db()
+        original = deepcopy(self.invoice.paid_snapshot)
+        for malformed in ({'schema_version': 1}, dict(original, schema_version=2)):
+            with self.subTest(snapshot=malformed):
+                Invoice.objects.filter(pk=self.invoice.pk).update(paid_snapshot=malformed)
+                response = self.detail()
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, 'không hợp lệ')
+                self.assertNotContains(response, 'Thuốc cảm')
+                self.assertNotContains(response, 'Khám tổng quát')
+        Invoice.objects.filter(pk=self.invoice.pk).update(paid_snapshot=original)
+
+    def test_inconsistent_snapshot_totals_are_rejected(self):
+        self.pay()
+        self.invoice.refresh_from_db()
+        snapshot = deepcopy(self.invoice.paid_snapshot)
+        snapshot['medicines'][0]['line_total'] = '0.00'
+        with self.assertRaises(ValueError):
+            self.invoice.validate_paid_snapshot(snapshot)
+        Invoice.objects.filter(pk=self.invoice.pk).update(paid_snapshot=snapshot)
+        self.assertContains(self.detail(), 'không hợp lệ')
+
+    def test_empty_medicine_and_service_lines_can_be_paid(self):
+        self.prescription.delete()
+        self.invoice.services.clear()
+        self.assertEqual(self.pay().status_code, 302)
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.paid_snapshot['medicines'], [])
+        self.assertEqual(self.invoice.paid_snapshot['services'], [])
+        self.assertEqual(self.invoice.paid_snapshot['totals']['total_amount'], '0.00')
+        self.assertContains(self.detail(), 'Không có thuốc')
+
+    def test_dashboard_revenue_and_existing_staff_rights_remain(self):
+        self.pay()
+        self.client.force_login(self.admin)
+        dashboard = self.client.get(reverse('dashboard:index'))
+        self.assertEqual(dashboard.context['stats']['paid_revenue'], Decimal('42.69'))
+        self.client.force_login(self.staff)
+        self.assertEqual(self.detail().status_code, 200)
+        self.assertEqual(
+            self.client.get(reverse('billing:update', args=[self.invoice.pk])).status_code,
+            403,
         )

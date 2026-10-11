@@ -58,14 +58,23 @@ def invoice_detail(request, pk):
         Invoice.objects.select_related(
             'medical_record__appointment__patient',
             'medical_record__appointment__doctor',
-        ).prefetch_related('services', 'medical_record__prescriptions__medicine'),
+        ),
         pk=pk,
     )
     if (not request.user.is_superuser
             and request.user.profile.role == 'doctor'
             and invoice.medical_record.appointment.doctor.user != request.user):
         raise PermissionDenied
-    return render(request, 'billing/invoice_detail.html', {'invoice': invoice})
+    context = {'invoice': invoice}
+    if invoice.status == 'Paid':
+        if invoice.paid_snapshot is None:
+            context['snapshot_warning'] = 'Hóa đơn cũ chưa có bản lưu chi tiết lúc thanh toán; chỉ hiển thị các tổng tiền đã lưu.'
+        else:
+            try:
+                context['paid_snapshot'] = invoice.validate_paid_snapshot(invoice.paid_snapshot)
+            except ValueError:
+                context['snapshot_warning'] = 'Bản lưu chi tiết hóa đơn không hợp lệ hoặc không được hỗ trợ; chỉ hiển thị các tổng tiền đã lưu.'
+    return render(request, 'billing/invoice_detail.html', context)
 
 
 @login_required
@@ -92,13 +101,21 @@ def invoice_update(request, pk):
 def invoice_mark_paid(request, pk):
     if request.method != 'POST':
         return redirect('billing:detail', pk=pk)
-    invoice = get_object_or_404(Invoice, pk=pk)
-    if (invoice.status != 'Pending'
-            or invoice.medical_record.appointment.status != 'done'):
-        raise PermissionDenied
     with transaction.atomic():
+        invoice = get_object_or_404(
+            Invoice.objects.select_related('medical_record__appointment').select_for_update(),
+            pk=pk,
+        )
+        if (invoice.status != 'Pending'
+                or invoice.paid_snapshot is not None
+                or invoice.medical_record.appointment.status != 'done'):
+            raise PermissionDenied
         invoice.recalculate()
-        invoice.status = 'Paid'
-        invoice.save(update_fields=['status'])
+        snapshot = invoice.build_paid_snapshot()
+        updated = Invoice.objects.filter(pk=pk, status='Pending', paid_snapshot__isnull=True).update(
+            status='Paid', paid_snapshot=snapshot,
+        )
+        if updated != 1:
+            raise PermissionDenied
     messages.success(request, f'Hóa đơn #{invoice.pk} đã được đánh dấu đã thanh toán.')
     return redirect('billing:detail', pk=pk)
